@@ -63,6 +63,180 @@ const generateMockAttendees = (count = 10) => {
   });
 };
 
+// Generate mock vendors
+const generateMockVendors = (count = 10) => {
+  const businessTypes = ['Catering', 'Photography', 'Entertainment', 'Venue', 'Decor', 'AV Equipment', 'Security', 'Transportation'];
+  const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego'];
+  const serviceAreas = [
+    ['10001', '10002', '10003'],
+    ['90001', '90002', '90003'],
+    ['60601', '60602', '60603'],
+    ['77001', '77002', '77003'],
+    ['85001', '85002', '85003'],
+    ['19101', '19102', '19103'],
+    ['78201', '78202', '78203'],
+    ['92101', '92102', '92103']
+  ];
+
+  return Array.from({ length: count }, (_, i) => {
+    const cityIndex = i % cities.length;
+    const businessType = businessTypes[i % businessTypes.length];
+    const businessName = `${businessType} ${['Pro', 'Elite', 'Premier', 'Global', 'Elite'][i % 5]} ${businessType} ${['Services', 'Solutions', 'Group', 'Co.', 'Inc.'][i % 5]}`;
+    
+    return {
+      id: `vendor-${i + 1}`,
+      businessName,
+      description: `Professional ${businessType.toLowerCase()} services with ${['5', '10', '15', '20+'][i % 4]} years of experience in the industry.`,
+      contactDetails: {
+        email: `contact@${businessName.toLowerCase().replace(/\s+/g, '')}.com`,
+        phone: `+1${Math.floor(2000000000 + Math.random() * 8000000000)}`,
+        website: `https://${businessName.toLowerCase().replace(/\s+/g, '')}.com`
+      },
+      location: {
+        address: `${Math.floor(100 + Math.random() * 9000)} ${['Main', 'Oak', 'Pine', 'Maple', 'Cedar'][i % 5]} St`,
+        city: cities[cityIndex],
+        state: ['NY', 'CA', 'IL', 'TX', 'AZ', 'PA'][cityIndex],
+        zipCode: serviceAreas[cityIndex][0],
+        serviceArea: serviceAreas[cityIndex],
+        coordinates: {
+          lat: 40.7128 - (i * 0.1) + (Math.random() * 0.2),
+          lng: -74.0060 + (i * 0.1) - (Math.random() * 0.2)
+        }
+      },
+      serviceTypes: [businessType],
+      rating: (4 + Math.random()).toFixed(1),
+      reviewCount: Math.floor(Math.random() * 100) + 5,
+      isVerified: Math.random() > 0.3,
+      yearsInBusiness: Math.floor(Math.random() * 20) + 1,
+      minBudget: [500, 1000, 2000, 5000][i % 4],
+      maxBudget: [5000, 10000, 20000, 50000][i % 4],
+      languages: ['English', 'Spanish', 'French', 'Mandarin'].slice(0, Math.floor(Math.random() * 3) + 1),
+      availability: {
+        monday: { open: '09:00', close: '17:00' },
+        tuesday: { open: '09:00', close: '17:00' },
+        wednesday: { open: '09:00', close: '17:00' },
+        thursday: { open: '09:00', close: '17:00' },
+        friday: { open: '09:00', close: '17:00' },
+        saturday: { open: '10:00', close: '15:00' },
+        sunday: 'closed'
+      },
+      socialMedia: {
+        facebook: `https://facebook.com/${businessName.toLowerCase().replace(/\s+/g, '')}`,
+        instagram: `https://instagram.com/${businessName.toLowerCase().replace(/\s+/g, '')}`,
+        twitter: `https://twitter.com/${businessName.toLowerCase().replace(/\s+/g, '')}`
+      },
+      createdAt: new Date(Date.now() - Math.floor(Math.random() * 365) * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  });
+};
+
+// Generate mock vendor services
+const generateMockVendorServices = (vendorId, count = 1) => {
+  const serviceTypes = [
+    { type: 'Catering', description: 'Full-service catering for events of all sizes' },
+    { type: 'Photography', description: 'Professional event photography services' },
+    { type: 'Videography', description: 'High-quality event videography' },
+    { type: 'DJ', description: 'Professional DJ services for any occasion' },
+    { type: 'Floral', description: 'Custom floral arrangements and decor' },
+    { type: 'Lighting', description: 'Event lighting design and installation' },
+    { type: 'Rentals', description: 'Event equipment and furniture rentals' },
+    { type: 'Staffing', description: 'Professional event staff and servers' }
+  ];
+
+  return Array.from({ length: count }, (_, i) => {
+    const serviceType = serviceTypes[Math.floor(Math.random() * serviceTypes.length)];
+    const pricingType = ['hourly', 'daily', 'flat', 'perPerson'][Math.floor(Math.random() * 4)];
+    const price = [50, 75, 100, 150, 200, 300, 500][Math.floor(Math.random() * 7)];
+    
+    return {
+      id: `service-${vendorId}-${i + 1}`,
+      vendorId,
+      serviceType: serviceType.type,
+      description: serviceType.description,
+      pricingStructure: {
+        type: pricingType,
+        amount: price,
+        currency: 'USD',
+        notes: pricingType === 'perPerson' ? 'Minimum 25 guests' : '4-hour minimum',
+        packages: [
+          { name: 'Basic', price: price, description: 'Basic service package' },
+          { name: 'Premium', price: Math.round(price * 1.5), description: 'Premium service package with additional features' }
+        ]
+      },
+      capacityLimits: {
+        minGuests: 10,
+        maxGuests: [50, 100, 200, 500][Math.floor(Math.random() * 4)]
+      },
+      isActive: true,
+      requiresSetup: Math.random() > 0.5,
+      setupTime: [15, 30, 60, 120][Math.floor(Math.random() * 4)],
+      teardownTime: [15, 30, 60][Math.floor(Math.random() * 3)],
+      cancellationPolicy: '50% refund if cancelled at least 14 days in advance',
+      depositRequired: true,
+      depositAmount: Math.round(price * 0.25),
+      createdAt: new Date(Date.now() - Math.floor(Math.random() * 180) * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  });
+};
+
+// Generate mock portfolio items
+const generateMockPortfolioItems = (serviceId, count = 3) => {
+  const types = ['image', 'image', 'image', 'video'];
+  const captions = [
+    'Wedding Reception', 'Corporate Event', 'Birthday Party', 'Conference',
+    'Product Launch', 'Charity Gala', 'Music Festival', 'Trade Show'
+  ];
+
+  return Array.from({ length: count }, (_, i) => {
+    const type = types[Math.floor(Math.random() * types.length)];
+    const isVideo = type === 'video';
+    const caption = captions[Math.floor(Math.random() * captions.length)];
+    
+    return {
+      id: `portfolio-${serviceId}-${i + 1}`,
+      serviceId,
+      type,
+      url: isVideo 
+        ? 'https://www.youtube.com/embed/dQw4w9WgXcQ' 
+        : `https://picsum.photos/seed/${serviceId}-${i + 1}/800/600`,
+      thumbnailUrl: `https://picsum.photos/seed/thumb-${serviceId}-${i + 1}/300/200`,
+      caption: `${caption} - ${isVideo ? 'Video' : 'Photo'}`,
+      featured: i === 0,
+      createdAt: new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000).toISOString()
+    };
+  });
+};
+
+// Generate mock certifications
+const generateMockCertifications = (serviceId, count = 2) => {
+  const types = [
+    'Food Safety Certification',
+    'Business License',
+    'Liquor License',
+    'Insurance Certificate',
+    'Health Department Permit'
+  ];
+
+  return Array.from({ length: count }, (_, i) => {
+    const type = types[Math.floor(Math.random() * types.length)];
+    const issuedDate = new Date(Date.now() - Math.floor(Math.random() * 365) * 24 * 60 * 60 * 1000);
+    
+    return {
+      id: `cert-${serviceId}-${i + 1}`,
+      serviceId,
+      type,
+      documentUrl: 'https://example.com/certificate.pdf',
+      issuedDate: issuedDate.toISOString(),
+      expiryDate: new Date(issuedDate.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      issuingAuthority: `${type.split(' ')[0]} Board`,
+      isVerified: Math.random() > 0.3,
+      verifiedAt: new Date(issuedDate.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    };
+  });
+};
+
 // Generate mock events
 const generateMockEvents = (count = 10) => {
   const eventTemplates = [
@@ -154,6 +328,26 @@ const generateMockFeedback = (eventId, attendeeId) => {
     submittedAt: new Date().toISOString()
   };
 };
+
+// Initialize mock data
+const mockVendors = generateMockVendors(15);
+const mockVendorServices = [];
+const mockPortfolioItems = [];
+const mockCertifications = [];
+
+// Generate services, portfolio items, and certifications for each vendor
+mockVendors.forEach(vendor => {
+  const services = generateMockVendorServices(vendor.id, Math.floor(Math.random() * 3) + 1);
+  mockVendorServices.push(...services);
+  
+  services.forEach(service => {
+    const portfolioItems = generateMockPortfolioItems(service.id, Math.floor(Math.random() * 5) + 1);
+    const certifications = generateMockCertifications(service.id, Math.floor(Math.random() * 3) + 1);
+    
+    mockPortfolioItems.push(...portfolioItems);
+    mockCertifications.push(...certifications);
+  });
+});
 
 // Mock API responses
 const mockApi = {
@@ -371,20 +565,307 @@ const mockApi = {
     };
   },
   
-  updateAttendeeStatus: (eventId, attendeeId, data) => {
-    console.log(`[Mock API] Updating status for attendee ${attendeeId} in event ${eventId}:`, data.status);
+  updateAttendeeStatus: async (eventId, attendeeId, data) => {
+    console.log(`[Mock API] updateAttendeeStatus called with eventId: ${eventId}, attendeeId: ${attendeeId}`, data);
+    // In a real implementation, this would update the attendee's status in the database
     return {
       status: 200,
       data: {
         success: true,
         message: 'Attendee status updated successfully',
-        attendeeId,
-        eventId,
-        status: data.status,
-        updatedAt: new Date().toISOString()
+        attendee: {
+          id: attendeeId,
+          status: data.status,
+          updatedAt: new Date().toISOString()
+        }
       }
     };
   },
+
+  // Vendor API endpoints
+  getVendorProfile: async () => {
+    // In a real app, this would get the logged-in vendor's profile
+    const vendor = mockVendors[0]; // Simulate logged-in vendor
+    return {
+      status: 200,
+      data: vendor
+    };
+  },
+
+  updateVendorProfile: async (data) => {
+    // In a real app, this would update the vendor's profile in the database
+    const updatedVendor = { ...mockVendors[0], ...data, updatedAt: new Date().toISOString() };
+    return {
+      status: 200,
+      data: {
+        success: true,
+        message: 'Vendor profile updated successfully',
+        vendor: updatedVendor
+      }
+    };
+  },
+
+  getVendorServices: async () => {
+    // In a real app, this would get the logged-in vendor's services
+    const vendorServices = mockVendorServices.filter(s => s.vendorId === mockVendors[0].id);
+    return {
+      status: 200,
+      data: vendorServices
+    };
+  },
+
+  createVendorService: async (data) => {
+    // In a real app, this would create a new service for the vendor
+    const newService = {
+      id: `service-${mockVendorServices.length + 1}`,
+      vendorId: mockVendors[0].id,
+      ...data,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    mockVendorServices.push(newService);
+    
+    return {
+      status: 201,
+      data: {
+        success: true,
+        message: 'Service created successfully',
+        service: newService
+      }
+    };
+  },
+
+  updateVendorService: async (serviceId, data) => {
+    // In a real app, this would update the service in the database
+    const serviceIndex = mockVendorServices.findIndex(s => s.id === serviceId);
+    if (serviceIndex === -1) {
+      return {
+        status: 404,
+        data: {
+          success: false,
+          message: 'Service not found'
+        }
+      };
+    }
+    
+    const updatedService = {
+      ...mockVendorServices[serviceIndex],
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+    
+    mockVendorServices[serviceIndex] = updatedService;
+    
+    return {
+      status: 200,
+      data: {
+        success: true,
+        message: 'Service updated successfully',
+        service: updatedService
+      }
+    };
+  },
+
+  deleteVendorService: async (serviceId) => {
+    // In a real app, this would delete the service from the database
+    const serviceIndex = mockVendorServices.findIndex(s => s.id === serviceId);
+    if (serviceIndex === -1) {
+      return {
+        status: 404,
+        data: {
+          success: false,
+          message: 'Service not found'
+        }
+      };
+    }
+    
+    mockVendorServices.splice(serviceIndex, 1);
+    
+    return {
+      status: 200,
+      data: {
+        success: true,
+        message: 'Service deleted successfully'
+      }
+    };
+  },
+
+  getServicePortfolio: async (serviceId) => {
+    // In a real app, this would get the portfolio items for a service
+    const portfolio = mockPortfolioItems.filter(item => item.serviceId === serviceId);
+    return {
+      status: 200,
+      data: portfolio
+    };
+  },
+
+  uploadPortfolioItem: async (serviceId, data) => {
+    // In a real app, this would upload the portfolio item to storage
+    const newItem = {
+      id: `portfolio-${mockPortfolioItems.length + 1}`,
+      serviceId,
+      ...data,
+      createdAt: new Date().toISOString()
+    };
+    
+    mockPortfolioItems.push(newItem);
+    
+    return {
+      status: 201,
+      data: {
+        success: true,
+        message: 'Portfolio item uploaded successfully',
+        item: newItem
+      }
+    };
+  },
+
+  deletePortfolioItem: async (itemId) => {
+    // In a real app, this would delete the portfolio item from storage
+    const itemIndex = mockPortfolioItems.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) {
+      return {
+        status: 404,
+        data: {
+          success: false,
+          message: 'Portfolio item not found'
+        }
+      };
+    }
+    
+    mockPortfolioItems.splice(itemIndex, 1);
+    
+    return {
+      status: 200,
+      data: {
+        success: true,
+        message: 'Portfolio item deleted successfully'
+      }
+    };
+  },
+
+  getServiceCertifications: async (serviceId) => {
+    // In a real app, this would get the certifications for a service
+    const certs = mockCertifications.filter(cert => cert.serviceId === serviceId);
+    return {
+      status: 200,
+      data: certs
+    };
+  },
+
+  uploadCertification: async (serviceId, data) => {
+    // In a real app, this would upload the certification document
+    const newCert = {
+      id: `cert-${mockCertifications.length + 1}`,
+      serviceId,
+      ...data,
+      isVerified: false,
+      verifiedAt: null,
+      createdAt: new Date().toISOString()
+    };
+    
+    mockCertifications.push(newCert);
+    
+    return {
+      status: 201,
+      data: {
+        success: true,
+        message: 'Certification uploaded successfully',
+        certification: newCert
+      }
+    };
+  },
+
+  deleteCertification: async (certId) => {
+    // In a real app, this would delete the certification
+    const certIndex = mockCertifications.findIndex(cert => cert.id === certId);
+    if (certIndex === -1) {
+      return {
+        status: 404,
+        data: {
+          success: false,
+          message: 'Certification not found'
+        }
+      };
+    }
+    
+    mockCertifications.splice(certIndex, 1);
+    
+    return {
+      status: 200,
+      data: {
+        success: true,
+        message: 'Certification deleted successfully'
+      }
+    };
+  },
+
+  getVendorBookings: async (filters = {}) => {
+    // In a real app, this would get the vendor's bookings with optional filters
+    const bookings = []; // Mock bookings would be generated here
+    return {
+      status: 200,
+      data: bookings
+    };
+  },
+
+  updateVendorAvailability: async (data) => {
+    // In a real app, this would update the vendor's availability in the database
+    return {
+      status: 200,
+      data: {
+        success: true,
+        message: 'Availability updated successfully',
+        availability: data
+      }
+    };
+  },
+
+  getVendorReviews: async (vendorId) => {
+    // In a real app, this would get reviews for the vendor
+    const reviews = []; // Mock reviews would be generated here
+    return {
+      status: 200,
+      data: reviews
+    };
+  },
+
+  searchVendors: async (filters = {}) => {
+    // In a real app, this would search vendors based on filters
+    let results = [...mockVendors];
+    
+    // Apply filters
+    if (filters.serviceType) {
+      results = results.filter(vendor => 
+        vendor.serviceTypes.includes(filters.serviceType)
+      );
+    }
+    
+    if (filters.location) {
+      const location = JSON.parse(filters.location);
+      results = results.filter(vendor => 
+        vendor.location.city === location.city || 
+        vendor.location.zipCode === location.zipCode
+      );
+    }
+    
+    if (filters.rating) {
+      results = results.filter(vendor => 
+        parseFloat(vendor.rating) >= parseFloat(filters.rating)
+      );
+    }
+    
+    return {
+      status: 200,
+      data: {
+        results,
+        total: results.length,
+        page: 1,
+        limit: 10
+      }
+    };
+  }
 };
 
 // Mock API calls with delay to simulate network request

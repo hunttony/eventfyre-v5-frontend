@@ -226,11 +226,131 @@ export const authApi = {
 
 // Vendor API calls
 export const vendorApi = {
+  // Availability Management
   getAvailability: () => get('/vendors/availability'),
   addAvailability: (data) => post('/vendors/availability', data),
+  
+  // Vendor Profile
+  getProfile: () => get('/vendors/profile'),
+  updateProfile: (profileData) => {
+    const formattedData = {
+      businessName: profileData.businessName,
+      contactDetails: {
+        email: profileData.email,
+        phone: profileData.phone,
+      },
+      location: {
+        city: profileData.city,
+        zipCode: profileData.zipCode,
+        serviceArea: profileData.serviceArea || [],
+      },
+      description: profileData.description,
+      website: profileData.website,
+    };
+    return put('/vendors/profile', formattedData);
+  },
+
+  // Services Management
   getServices: () => get('/services/my-services'),
+  getService: (serviceId) => get(`/vendors/services/${serviceId}`),
+  createService: (serviceData) => {
+    const formattedData = {
+      serviceType: serviceData.serviceType,
+      description: serviceData.description,
+      pricingStructure: {
+        type: serviceData.pricingType,
+        amount: serviceData.amount,
+        currency: serviceData.currency || 'USD',
+      },
+      capacityLimits: {
+        minGuests: serviceData.minGuests || null,
+        maxGuests: serviceData.maxGuests || null,
+      },
+    };
+    return post('/vendors/services', formattedData);
+  },
   updateService: (serviceId, data) => put(`/vendors/services/${serviceId}`, data),
+  deleteService: (serviceId) => del(`/vendors/services/${serviceId}`),
+
+  // Portfolio Management
+  uploadPortfolioMedia: (serviceId, mediaData) => {
+    const formData = new FormData();
+    formData.append('file', mediaData.file);
+    formData.append('description', mediaData.description || '');
+    formData.append('type', mediaData.type || 'photo');
+
+    return post(`/vendors/services/${serviceId}/portfolio`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getPortfolio: (serviceId) => get(`/vendors/services/${serviceId}/portfolio`),
+  deletePortfolioItem: (serviceId, mediaId) => 
+    del(`/vendors/services/${serviceId}/portfolio/${mediaId}`),
+
+  // Certifications
+  submitCertification: (serviceId, certificationData) => {
+    const formData = new FormData();
+    formData.append('type', certificationData.type);
+    formData.append('document', certificationData.document);
+    if (certificationData.issuedDate) formData.append('issuedDate', certificationData.issuedDate);
+    if (certificationData.expiryDate) formData.append('expiryDate', certificationData.expiryDate);
+    if (certificationData.issuingAuthority) formData.append('issuingAuthority', certificationData.issuingAuthority);
+
+    return post(`/vendors/services/${serviceId}/certifications`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getCertifications: (serviceId) => get(`/vendors/services/${serviceId}/certifications`),
+  deleteCertification: (serviceId, certificationId) => 
+    del(`/vendors/services/${serviceId}/certifications/${certificationId}`),
+
+  // Events and Engagement
   getEvents: () => get('/vendors/events'),
+  getEventEngagement: (eventId, filters = {}) => {
+    const params = {};
+    if (filters.sessionId) params.sessionId = filters.sessionId;
+    if (filters.dateRange) params.dateRange = JSON.stringify(filters.dateRange);
+    return get(`/vendors/events/${eventId}/engagement`, { params });
+  },
+  getLeads: (eventId, filters = {}) => {
+    const params = {};
+    if (filters.status) params.status = filters.status;
+    if (filters.dateRange) params.dateRange = JSON.stringify(filters.dateRange);
+    return get(`/vendors/events/${eventId}/leads`, { params });
+  },
+  
+  // Feedback
+  submitEventFeedback: (eventId, feedbackData) => 
+    post(`/vendors/events/${eventId}/feedback`, {
+      ratings: feedbackData.ratings,
+      comments: feedbackData.comments || null,
+      submittedBy: feedbackData.submittedBy || 'anonymous',
+    }),
+  getEventFeedback: (eventId, filters = {}) => {
+    const params = {};
+    if (filters.submittedBy) params.submittedBy = filters.submittedBy;
+    if (filters.rating) params.rating = filters.rating;
+    return get(`/vendors/events/${eventId}/feedback`, { params });
+  },
+
+  // Integrations
+  updateIntegrationPreferences: (preferencesData) => 
+    put('/vendors/integrations', {
+      paymentMethods: preferencesData.paymentMethods || [],
+      crmIntegrations: preferencesData.crmIntegrations || [],
+    }),
+  getIntegrationPreferences: () => get('/vendors/integrations'),
+
+  // Search (for vendors to find other vendors or for organizers to find vendors)
+  searchVendors: (filters = {}) => {
+    const params = {};
+    if (filters.serviceType) params.serviceType = filters.serviceType;
+    if (filters.location) params.location = JSON.stringify(filters.location);
+    if (filters.availability) params.availability = JSON.stringify(filters.availability);
+    if (filters.capacity) params.capacity = JSON.stringify(filters.capacity);
+    if (filters.rating) params.rating = filters.rating;
+    return get('/vendors/search', { params });
+  },
 };
 
 // Organizer API calls

@@ -22,8 +22,8 @@ const handleMockCall = async (endpoint, params = {}) => {
   }
 };
 
-// Mock implementation of eventsApi that falls back to mock data
-const mockEventsApi = {
+// Mock implementation of the API that falls back to mock data
+const mockApi = {
   // Event listing endpoints
   getUpcomingEvents: async () => handleMockCall('getUpcomingEvents'),
   getPastEvents: async () => handleMockCall('getPastEvents'),
@@ -73,7 +73,66 @@ const mockEventsApi = {
     handleMockCall('getEventVendors', { eventId }),
     
   getEventSchedule: async (eventId) => 
-    handleMockCall('getEventSchedule', { eventId })
+    handleMockCall('getEventSchedule', { eventId }),
+    
+  // Vendor API endpoints
+  // Vendor Profile
+  getVendorProfile: async () => 
+    handleMockCall('getVendorProfile'),
+    
+  updateVendorProfile: async (data) => 
+    handleMockCall('updateVendorProfile', data),
+    
+  // Vendor Services
+  getVendorServices: async () => 
+    handleMockCall('getVendorServices'),
+    
+  createVendorService: async (data) => 
+    handleMockCall('createVendorService', data),
+    
+  updateVendorService: async (serviceId, data) => 
+    handleMockCall('updateVendorService', { serviceId, ...data }),
+    
+  deleteVendorService: async (serviceId) => 
+    handleMockCall('deleteVendorService', { serviceId }),
+    
+  // Portfolio Management
+  getServicePortfolio: async (serviceId) => 
+    handleMockCall('getServicePortfolio', { serviceId }),
+    
+  uploadPortfolioItem: async (serviceId, data) => 
+    handleMockCall('uploadPortfolioItem', { serviceId, ...data }),
+    
+  deletePortfolioItem: async (itemId) => 
+    handleMockCall('deletePortfolioItem', { itemId }),
+    
+  // Certifications
+  getServiceCertifications: async (serviceId) => 
+    handleMockCall('getServiceCertifications', { serviceId }),
+    
+  uploadCertification: async (serviceId, data) => 
+    handleMockCall('uploadCertification', { serviceId, ...data }),
+    
+  deleteCertification: async (certId) => 
+    handleMockCall('deleteCertification', { certId }),
+    
+  // Bookings & Availability
+  getVendorBookings: async (filters = {}) => 
+    handleMockCall('getVendorBookings', filters),
+    
+  updateVendorAvailability: async (data) => 
+    handleMockCall('updateVendorAvailability', data),
+    
+  // Reviews
+  getVendorReviews: async (vendorId) => 
+    handleMockCall('getVendorReviews', { vendorId }),
+    
+  // Search
+  searchVendors: async (filters = {}) => 
+    handleMockCall('searchVendors', filters)
 };
 
-export default mockEventsApi;
+// For backward compatibility
+export const mockEventsApi = mockApi;
+
+export default mockApi;
