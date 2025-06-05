@@ -16,54 +16,11 @@ function Register() {
     { value: 'organizer', label: 'Event Organizer' },
     { value: 'vendor', label: 'Vendor/Service Provider' }
   ];
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Basic validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-        // Prepare the registration data
-      const registrationData = {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        role: formData.role
-      };
-
-      const response = await authApi.register(registrationData);
-
-      setSuccess('Registration successful! Redirecting to login...');
-      
-      // Redirect to login after a short delay
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
-      
-    } catch (err) {
-      console.error('Registration error:', err);
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -71,6 +28,83 @@ function Register() {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      // Client-side validation
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error('Passwords do not match');
+      }
+
+      if (formData.password.length < 8) {
+        throw new Error('Password must be at least 8 characters long');
+      }
+
+      // Prepare the registration data
+      const registrationData = {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        role: formData.role
+      };
+
+      console.log('Attempting registration with data:', registrationData);
+      
+      const response = await authApi.register(registrationData);
+      
+      if (!response?.data?.success) {
+        throw new Error(response?.data?.message || 'Registration was not successful');
+      }
+
+      setSuccess('Registration successful! You will be redirected to login shortly...');
+      
+      // Redirect to login after a short delay
+      setTimeout(() => {
+        navigate('/login', { 
+          state: { 
+            message: 'Registration successful! Please log in with your credentials.' 
+          } 
+        });
+      }, 2000);
+      
+    } catch (err) {
+      console.error('Registration error:', err);
+      
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      // Handle different types of errors
+      if (err.isNetworkError) {
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      } else if (err.isApiError) {
+        // Handle API validation errors
+        if (err.errors) {
+          // Format field-specific validation errors
+          const fieldErrors = Object.entries(err.errors)
+            .map(([field, messages]) => 
+              Array.isArray(messages) 
+                ? `${field}: ${messages.join(', ')}` 
+                : messages
+            )
+            .join('\n');
+          errorMessage = `Validation errors:\n${fieldErrors}`;
+        } else {
+          errorMessage = err.message || errorMessage;
+        }
+      } else if (err.message) {
+        // Handle other JavaScript errors
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

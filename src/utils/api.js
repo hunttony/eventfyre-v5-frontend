@@ -53,9 +53,16 @@ setInterval(() => {
   }
 }, 60000); // Run cleanup every minute
 
-// Response interceptor for handling errors and caching
+// Response interceptor for handling responses and errors
 api.interceptors.response.use(
   (response) => {
+    // Log successful responses for debugging
+    console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+      status: response.status,
+      data: response.data,
+      headers: response.headers
+    });
+    
     // Only cache successful GET responses
     if (response.config.method?.toLowerCase() === 'get' && response.status === 200) {
       const cacheKey = `${response.config.url}:${JSON.stringify(response.config.params || {})}`;
@@ -64,75 +71,102 @@ api.interceptors.response.use(
         timestamp: Date.now()
       });
     }
+    
+    // Ensure consistent response structure
+    if (response.data) {
+      return {
+        ...response,
+        data: {
+          success: true,
+          ...response.data
+        }
+      };
+    }
+    
     return response;
   },
   async (error) => {
     const originalRequest = error.config;
     
     // Log error details for debugging
-    if (error.response) {
-      console.error('API Error Response:', {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        url: originalRequest.url,
-        method: originalRequest.method,
-        data: error.response.data,
-        headers: error.response.headers
-      });
-      
-      // Handle 401 Unauthorized
-      if (error.response.status === 401) {
-        console.warn('Authentication required - redirecting to login');
-        // Clear any invalid tokens
-        localStorage.removeItem('token');
-        // Redirect to login page
-        window.location.href = '/login';
+    console.error('[API Error]', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      config: {
+        url: originalRequest?.url,
+        method: originalRequest?.method,
+        data: originalRequest?.data
       }
-      
-      // Handle CORS errors
-      if (error.response.status === 0) {
-        console.error('CORS Error - Check if the backend is running and CORS is properly configured');
-        return Promise.reject(new Error('Unable to connect to the server. Please check your connection and try again.'));
-      }
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('API Request Error - No response received:', {
-        url: originalRequest.url,
-        method: originalRequest.method,
-        timeout: error.code === 'ECONNABORTED' ? 'Request Timeout' : 'Unknown Error'
-      });
-    } else {
-      // Something happened in setting up the request
-      console.error('API Setup Error:', error.message);
+    });
+
+    // Handle network errors
+    if (!error.response) {
+      const networkError = new Error('Network error. Please check your connection.');
+      networkError.isNetworkError = true;
+      return Promise.reject(networkError);
     }
+
+    // Create a consistent error object
+    const apiError = new Error(
+      error.response.data?.message || 
+      error.message || 
+      'An error occurred. Please try again.'
+    );
     
-    // If the error is 429 (Too Many Requests) or 5xx server error
-    if (error.response?.status === 429 || (error.response?.status >= 500 && error.response?.status < 600)) {
+    // Attach additional error information
+    apiError.status = error.response.status;
+    apiError.response = error.response;
+    apiError.isApiError = true;
+    
+    // Handle specific error statuses
+    if (error.response.status === 401) {
+      // Handle unauthorized (e.g., token expired)
+      localStorage.removeItem('token');
+      window.dispatchEvent(new Event('unauthorized'));
+      apiError.message = 'Your session has expired. Please log in again.';
+    } else if (error.response.status === 403) {
+      apiError.message = 'You do not have permission to perform this action.';
+    } else if (error.response.status === 400) {
+      // For 400 errors, include the validation errors if they exist
+      if (error.response.data?.errors) {
+        apiError.errors = error.response.data.errors;
+        apiError.message = 'Please fix the following errors:';
+      } else if (error.response.data?.message) {
+        apiError.message = error.response.data.message;
+      } else {
+        apiError.message = 'Validation failed. Please check your input.';
+      }
+    } else if (error.response.status === 404) {
+      apiError.message = 'The requested resource was not found.';
+    } else if (error.response.status === 429) {
+      apiError.message = 'Too many requests. Please try again later.';
+    } else if (error.response.status >= 500) {
+      apiError.message = 'Server error. Please try again later.';
+    }
+
+    // For 5xx errors, check if we have a cached response
+    if (error.response.status >= 500 && error.response.status < 600 && originalRequest) {
       const cacheKey = `${originalRequest.url}:${JSON.stringify(originalRequest.params || {})}`;
-      
-      // Check if we have a cached response we can use
       const cached = responseCache.get(cacheKey);
       const cacheAge = cached ? Date.now() - cached.timestamp : Infinity;
       
       // If we have a recent cached response, use it
       if (cached && cacheAge < CACHE_DURATION) {
-        console.log(`Using cached response (${Math.floor(cacheAge/1000)}s old) due to ${error.response.status} error`);
-        return Promise.resolve(cached.data);
-      }
-      
-      // If there's already a pending request for this resource, wait for it
-      if (pendingRequests.has(cacheKey)) {
-        console.log('Request already in progress, waiting for response...');
-        return new Promise((resolve) => {
-          pendingRequests.get(cacheKey).queue.push(resolve);
+        console.log(`Using cached response (${Math.floor(cacheAge/1000)}s old) due to server error`);
+        return Promise.resolve({
+          data: {
+            success: true,
+            ...cached.data,
+            _cached: true
+          }
         });
       }
-      
-      // TEMP: Disable retry count for testing
-      // Always immediately reject to avoid retry delays during login testing
-      return Promise.reject(error);
+    }
+
+    return Promise.reject(apiError);
   }
-});
+);
 
 // Helper functions for common CRUD operations
 export const get = (url, config = {}) => api.get(url, config);
@@ -143,7 +177,22 @@ export const del = (url, config = {}) => api.delete(url, config);
 // Auth API calls
 export const authApi = {
   login: (credentials) => post('/auth/login', credentials),
-  register: (userData) => post('/auth/register', userData),
+  register: async (userData) => {
+    try {
+      console.log('Registering user with data:', userData);
+      const response = await post('/auth/register', userData);
+      console.log('Registration successful, response:', response);
+      return response;
+    } catch (error) {
+      console.error('Registration API error:', {
+        error,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
+      throw error; // Re-throw to allow component to handle it
+    }
+  },
   getMe: () => get('/auth/me'),
   forgotPassword: (email) => post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => 
