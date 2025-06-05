@@ -355,14 +355,162 @@ export const vendorApi = {
 
 // Organizer API calls
 export const organizerApi = {
+  // Event Management
   getEvents: () => get('/organizer/events'),
   getEvent: (eventId) => get(`/organizer/events/${eventId}`),
-  createEvent: (data) => post('/organizer/events', data),
-  updateEvent: (eventId, data) => put(`/organizer/events/${eventId}`, data),
+  createEvent: (data) => {
+    const eventData = {
+      eventType: data.eventType,
+      expectedAttendance: data.expectedAttendance,
+      budgetRange: data.budgetRange,
+      preferredDates: data.preferredDates,
+      locations: data.locations,
+      vendorPreferences: data.vendorPreferences || [],
+      marketingChannels: data.marketingChannels || [],
+      integrationNeeds: data.integrationNeeds || [],
+      ...data // Include any additional fields
+    };
+    return post('/organizer/events', eventData);
+  },
+  updateEvent: (eventId, data) => {
+    const eventData = {
+      eventType: data.eventType,
+      expectedAttendance: data.expectedAttendance,
+      budgetRange: data.budgetRange,
+      preferredDates: data.preferredDates,
+      locations: data.locations,
+      vendorPreferences: data.vendorPreferences,
+      marketingChannels: data.marketingChannels,
+      integrationNeeds: data.integrationNeeds,
+      ...data // Include any additional fields
+    };
+    return put(`/organizer/events/${eventId}`, eventData);
+  },
   deleteEvent: (eventId) => del(`/organizer/events/${eventId}`),
-  getAvailableVendors: (eventId) => get(`/organizer/events/${eventId}/vendors/available`),
-  assignVendor: (eventId, vendorId) => post(`/organizer/events/${eventId}/vendors/${vendorId}`),
+  
+  // Vendor Management
+  getAvailableVendors: (eventId, filters = {}) => {
+    const params = {
+      serviceType: filters.serviceType,
+      location: filters.location ? JSON.stringify(filters.location) : null,
+      budget: filters.budget ? JSON.stringify(filters.budget) : null,
+      availability: filters.availability ? JSON.stringify(filters.availability) : null,
+    };
+    return get(`/organizer/events/${eventId}/vendors/available`, { params });
+  },
+  assignVendor: (eventId, vendorId, serviceData) =>
+    post(`/organizer/events/${eventId}/vendors/${vendorId}`, { serviceData }),
   unassignVendor: (eventId, vendorId) => del(`/organizer/events/${eventId}/vendors/${vendorId}`),
+  
+  // Organizer Profile
+  getOrganizerProfile: () => get('/organizer/profile'),
+  updateOrganizerProfile: (profileData) => {
+    const formattedData = {
+      fullName: profileData.fullName || profileData.businessName,
+      email: profileData.email,
+      phoneNumber: profileData.phoneNumber || null,
+      consent: {
+        phoneContact: profileData.consent?.phoneContact || false,
+        marketingEmails: profileData.consent?.marketingEmails || false,
+        dataSharing: profileData.consent?.dataSharing || false,
+      },
+    };
+    return put('/organizer/profile', formattedData);
+  },
+  
+  // Billing & Invoicing
+  updateBillingInfo: (billingData) => {
+    const formattedData = {
+      billingAddress: billingData.billingAddress,
+      paymentMethod: billingData.paymentMethod,
+      billingEmail: billingData.billingEmail || null,
+    };
+    return put('/organizer/billing', formattedData);
+  },
+  
+  // Analytics
+  getTicketSales: (eventId, filters = {}) => {
+    const params = {
+      dateRange: filters.dateRange ? JSON.stringify(filters.dateRange) : null,
+      ticketType: filters.ticketType || null,
+    };
+    return get(`/organizer/events/${eventId}/analytics/ticket-sales`, { params });
+  },
+  
+  getAttendeeEngagement: (eventId, filters = {}) => {
+    const params = {
+      sessionId: filters.sessionId || null,
+      dateRange: filters.dateRange ? JSON.stringify(filters.dateRange) : null,
+      metric: filters.metric || null,
+    };
+    return get(`/organizer/events/${eventId}/analytics/engagement`, { params });
+  },
+  
+  getVendorPerformance: (eventId, vendorId, filters = {}) => {
+    const params = {
+      dateRange: filters.dateRange ? JSON.stringify(filters.dateRange) : null,
+      metric: filters.metric || null,
+    };
+    return get(`/organizer/events/${eventId}/vendors/${vendorId}/performance`, { params });
+  },
+  
+  // Feedback
+  getPostEventFeedback: (eventId, filters = {}) => {
+    const params = {
+      source: filters.source || null,
+      rating: filters.rating || null,
+    };
+    return get(`/organizer/events/${eventId}/feedback`, { params });
+  },
+  
+  submitPostEventFeedback: (eventId, feedbackData) => {
+    const formattedData = {
+      ratings: feedbackData.ratings,
+      comments: feedbackData.comments || null,
+      source: feedbackData.source || 'organizer',
+    };
+    return post(`/organizer/events/${eventId}/feedback`, formattedData);
+  },
+  
+  // Integrations
+  updateIntegrationPreferences: (integrationData) => {
+    const formattedData = {
+      crmIntegrations: integrationData.crmIntegrations || [],
+      paymentGateways: integrationData.paymentGateways || [],
+      socialMediaApis: integrationData.socialMediaApis || [],
+    };
+    return put('/organizer/integrations', formattedData);
+  },
+  
+  getIntegrationPreferences: () => get('/organizer/integrations'),
+  
+  connectCrm: (crmType, credentials) =>
+    post(`/organizer/integrations/crm/${crmType}`, credentials),
+    
+  connectPaymentGateway: (gatewayType, credentials) =>
+    post(`/organizer/integrations/payment/${gatewayType}`, credentials),
+    
+  connectSocialMedia: (platform, credentials) =>
+    post(`/organizer/integrations/social/${platform}`, credentials),
+    
+  // Data Privacy
+  updateDataPrivacyPreferences: (privacyData) => {
+    const formattedData = {
+      dataRetention: privacyData.dataRetention || 'standard',
+      anonymizeAnalytics: privacyData.anonymizeAnalytics || false,
+      optOutMarketing: privacyData.optOutMarketing || false,
+    };
+    return put('/organizer/privacy', formattedData);
+  },
+  
+  // Marketing Analytics
+  getMarketingAnalytics: (eventId, filters = {}) => {
+    const params = {
+      channel: filters.channel || null,
+      dateRange: filters.dateRange ? JSON.stringify(filters.dateRange) : null,
+    };
+    return get(`/organizer/events/${eventId}/analytics/marketing`, { params });
+  },
 };
 
 // Events API calls
