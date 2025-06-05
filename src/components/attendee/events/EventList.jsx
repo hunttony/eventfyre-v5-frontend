@@ -1,11 +1,67 @@
 import { Link } from 'react-router-dom';
 import { format, parseISO, isPast, isToday } from 'date-fns';
+import { useAttendee } from '../../../contexts/AttendeeContext';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
 const EventList = ({ 
   events = [], 
-  emptyMessage = 'No events found.', 
-  loading = false 
+  emptyMessage = 'No events found.',
+  loading = false,
+  onSaveEvent,
+  isSavedList = false,
+  showFeedback = false,
+  onFeedbackClick
 }) => {
+  EventList.propTypes = {
+    events: PropTypes.array,
+    emptyMessage: PropTypes.string,
+    loading: PropTypes.bool,
+    onSaveEvent: PropTypes.func,
+    isSavedList: PropTypes.bool,
+    showFeedback: PropTypes.bool,
+    onFeedbackClick: PropTypes.func
+  };
+
+  const { saveEvent, unsaveEvent, isEventSaved } = useAttendee();
+  const [localEvents, setLocalEvents] = useState(events);
+  const [savingStates, setSavingStates] = useState({});
+
+  // Update local events when props change
+  useEffect(() => {
+    setLocalEvents(events);
+  }, [events]);
+
+  // Handle save/unsave event
+  const handleSaveEvent = async (eventId, isCurrentlySaved) => {
+    try {
+      setSavingStates(prev => ({ ...prev, [eventId]: true }));
+      
+      if (isCurrentlySaved) {
+        await unsaveEvent(eventId);
+      } else {
+        await saveEvent(eventId);
+      }
+      
+      // Update local state if needed
+      if (onSaveEvent) {
+        onSaveEvent(eventId, !isCurrentlySaved);
+      }
+      
+      // Update the local events to reflect the change
+      setLocalEvents(prevEvents => 
+        prevEvents.map(event => 
+          event.id === eventId || event._id === eventId
+            ? { ...event, isSaved: !isCurrentlySaved }
+            : event
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling save status:', error);
+    } finally {
+      setSavingStates(prev => ({ ...prev, [eventId]: false }));
+    }
+  };
   if (loading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -116,7 +172,7 @@ const EventList = ({
   };
 
   // Handle empty state
-  if (!loading && (!events || events.length === 0)) {
+  if (!loading && (!localEvents || localEvents.length === 0)) {
     return (
       <div className="text-center py-12">
         <svg
@@ -160,7 +216,7 @@ const EventList = ({
 
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {events.map((event) => {
+      {localEvents.map((event) => {
         const status = getEventStatus(event.startDate, event.endDate);
         const eventImage = getEventImage(event);
         const eventDate = formatDate(event.startDate);
@@ -197,21 +253,28 @@ e.target.src = `https://picsum.photos/seed/fallback-${seed}/400/200`;
                   <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight">
                     {event.title || 'Untitled Event'}
                   </h3>
-                  {(event.isSaved || event.saved) && (
-                    <button 
-                      className="text-yellow-500 hover:text-yellow-600 ml-2 mt-1"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Handle save/unsave functionality
-                        console.log('Toggle save for event:', event._id || event.id);
-                      }}
-                    >
+                  <button 
+                    className={`ml-2 mt-1 ${event.isSaved || event.saved ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-300 hover:text-gray-400'}`}
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const eventId = event._id || event.id;
+                      await handleSaveEvent(eventId, event.isSaved || event.saved);
+                    }}
+                    disabled={savingStates[event._id || event.id]}
+                    title={event.isSaved || event.saved ? 'Remove from saved' : 'Save for later'}
+                  >
+                    {savingStates[event._id || event.id] ? (
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
                       <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
                       </svg>
-                    </button>
-                  )}
+                    )}
+                  </button>
                 </div>
                 
                 {event.description && (
@@ -265,7 +328,7 @@ e.target.src = `https://picsum.photos/seed/fallback-${seed}/400/200`;
                 </div>
               </div>
               
-              <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
                 <Link
                   to={`/events/${event._id || event.id}`}
                   className="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 group"
@@ -280,6 +343,22 @@ e.target.src = `https://picsum.photos/seed/fallback-${seed}/400/200`;
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </Link>
+                
+                {showFeedback && status === 'past' && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (onFeedbackClick) {
+                        onFeedbackClick(event);
+                      }
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    disabled={event.feedbackSubmitted}
+                  >
+                    {event.feedbackSubmitted ? 'Feedback Submitted' : 'Leave Feedback'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -22,12 +22,72 @@ const handleMockCall = async (endpoint, params = {}) => {
   }
 };
 
+// Import the mock data service
+import mockDataService from './mockDataService';
+
 // Mock implementation of the API that falls back to mock data
 const mockApi = {
+  // Authentication endpoints
+  register: async (userData) => {
+    console.log('[mockApi] Registering user:', userData);
+    try {
+      const result = await mockDataService.register(userData);
+      console.log('[mockApi] Registration result:', result);
+      return result;
+    } catch (error) {
+      console.error('[mockApi] Registration error:', error);
+      throw error;
+    }
+  },
+  
+  login: async (credentials) => {
+    console.log('[mockApi] Logging in user:', credentials.email);
+    try {
+      const result = await mockDataService.login(credentials);
+      console.log('[mockApi] Login result:', result);
+      return result;
+    } catch (error) {
+      console.error('[mockApi] Login error:', error);
+      throw error;
+    }
+  },
+  
+  getCurrentUser: async () => {
+    console.log('[mockApi] Getting current user');
+    try {
+      const result = await mockDataService.getCurrentUser();
+      console.log('[mockApi] Current user:', result);
+      return result;
+    } catch (error) {
+      console.error('[mockApi] Get current user error:', error);
+      throw error;
+    }
+  },
+  
   // Event listing endpoints
-  getUpcomingEvents: async () => handleMockCall('getUpcomingEvents'),
-  getPastEvents: async () => handleMockCall('getPastEvents'),
-  getSavedEvents: async () => handleMockCall('getSavedEvents'),
+  getUpcomingEvents: async () => {
+    console.log('[mockApi] Getting upcoming events');
+    const result = await handleMockCall('getUpcomingEvents');
+    console.log('[mockApi] Upcoming events result:', result);
+    return result;
+  },
+  getPastEvents: async () => {
+    console.log('[mockApi] Getting past events');
+    const result = await handleMockCall('getPastEvents');
+    console.log('[mockApi] Past events result:', result);
+    return result;
+  },
+  getSavedEvents: async () => {
+    console.log('[mockApi] Getting saved events');
+    try {
+      const result = await handleMockCall('getSavedEvents');
+      console.log('[mockApi] Saved events result:', result);
+      return result;
+    } catch (error) {
+      console.error('[mockApi] Error getting saved events:', error);
+      return { data: [] }; // Return empty array on error
+    }
+  },
   searchEvents: async (query) => handleMockCall('searchEvents', { query }),
   
   // Event details
@@ -132,7 +192,7 @@ const mockApi = {
     handleMockCall('searchVendors', filters)
 };
 
-// For backward compatibility
+// Export both named and default for compatibility
 export const mockEventsApi = mockApi;
-
+export { mockApi };
 export default mockApi;

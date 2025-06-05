@@ -28,33 +28,34 @@ function Login() {
 
     try {
       console.log('Attempting login with:', { 
-        email: formData.email,
-        endpoint: `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'}/auth/login`
+        email: formData.email
       });
       
-      const { success, error, user: responseUser } = await login(formData.email, formData.password);
-      console.log('Login response:', { success, error, responseUser });
+      const result = await login(formData.email, formData.password);
+      console.log('Login result:', result);
       
-      if (success) {
-        // Get user from localStorage (set by AuthContext)
-        const user = JSON.parse(localStorage.getItem('user'));
-        console.log('User from localStorage after login:', user);
+      if (result.success) {
+        // Get user from the result or localStorage
+        const user = result.user || JSON.parse(localStorage.getItem('user'));
+        console.log('User after login:', user);
         
-        if (from !== '/') {
-          console.log('Redirecting to from path:', from);
-          navigate(from, { replace: true });
+        // Determine redirect path
+        let redirectPath = '/';
+        
+        if (from && from !== '/') {
+          redirectPath = from;
         } else if (user?.role === 'organizer') {
-          console.log('Redirecting to organizer dashboard');
-          navigate('/organizer/dashboard', { replace: true });
+          redirectPath = '/organizer/dashboard';
         } else if (user?.role === 'vendor') {
-          console.log('Redirecting to vendor dashboard');
-          navigate('/vendor/dashboard', { replace: true });
-        } else {
-          console.log('Redirecting to attendee dashboard');
-          navigate('/attendee/dashboard', { replace: true });
+          redirectPath = '/vendor/dashboard';
+        } else if (user?.role === 'attendee') {
+          redirectPath = '/attendee/dashboard';
         }
+        
+        console.log('Redirecting to:', redirectPath);
+        navigate(redirectPath, { replace: true });
       } else {
-        setError(error || 'Login failed. Please check your credentials.');
+        setError(result.error || 'Login failed. Please check your credentials.');
       }
     } catch (err) {
       console.error('Login error:', err); 

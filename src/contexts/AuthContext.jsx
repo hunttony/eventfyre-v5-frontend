@@ -99,23 +99,12 @@ export function AuthProvider({ children }) {
       // Case 1: Response has token and user at top level
       if (response.token && response.user) {
         ({ token, user } = response);
-      } 
-      // Case 2: Response has data object with token and user
-      else if (response.data?.token && response.data?.user) {
+        
+        // Store user in localStorage
+        localStorage.setItem('user', JSON.stringify(user));
+      } else if (response.data?.token && response.data?.user) {
+        // Standard response format from our mock API
         ({ token, user } = response.data);
-      }
-      // Case 3: Response has data with user and token is in a different format
-      else if (response.data?.user && response.headers?.authorization) {
-        token = response.headers.authorization.replace('Bearer ', '');
-        user = response.data.user;
-      } 
-      // Case 4: Response is just the user object with token as a property
-      else if (response.user && response.user.token) {
-        token = response.user.token;
-        user = response.user;
-        // Remove token from user object before storing
-        const { token: _, ...userWithoutToken } = user;
-        user = userWithoutToken;
       } else {
         console.error('Unexpected response format:', response);
         throw new Error('Invalid response format from server');
@@ -123,6 +112,12 @@ export function AuthProvider({ children }) {
       
       if (!token || !user) {
         throw new Error('Missing token or user data in response');
+      }
+      
+      // Ensure user has a role, default to 'attendee' if not set
+      if (!user.role) {
+        console.warn('User role not set, defaulting to attendee');
+        user.role = 'attendee';
       }
       
       // Store token and user in localStorage
@@ -133,6 +128,7 @@ export function AuthProvider({ children }) {
       setToken(token);
       setCurrentUser(user);
       
+      console.log('User logged in with role:', user.role);
       return { success: true, user };
     } catch (error) {
       console.error('Login error:', error);
@@ -145,17 +141,48 @@ export function AuthProvider({ children }) {
 
   const register = async (userData) => {
     try {
+      console.log('Starting registration with data:', userData);
       const response = await authApi.register(userData);
-      const { token, user } = response;
+      console.log('Registration response:', response);
       
+      // Handle response format
+      let token, user;
+      
+      if (response.data?.token && response.data?.user) {
+        // Standard response format from our mock API
+        ({ token, user } = response.data);
+      } else if (response.token && response.user) {
+        // Alternative format
+        ({ token, user } = response);
+      } else {
+        console.error('Unexpected response format:', response);
+        throw new Error('Invalid response format from server');
+      }
+      
+      if (!token || !user) {
+        throw new Error('Missing token or user data in response');
+      }
+      
+      // Ensure user has a role, default to 'attendee' if not set
+      if (!user.role) {
+        user.role = userData.role || 'attendee';
+      }
+      
+      // Store token and user in localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      // Update state
       setToken(token);
       setCurrentUser(user);
-      return { success: true };
+      
+      console.log('User registered with role:', user.role);
+      return { success: true, user };
     } catch (error) {
       console.error('Registration error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Registration failed. Please try again.' 
+        error: error.response?.data?.message || error.message || 'Registration failed. Please try again.' 
       };
     }
   };
@@ -198,7 +225,13 @@ export function AuthProvider({ children }) {
     register,
     logout,
     updateUser,
-    hasRole: (role) => currentUser?.role === role,
+    hasRole: (role) => {
+      if (!currentUser) return false;
+      if (Array.isArray(role)) {
+        return role.includes(currentUser.role);
+      }
+      return currentUser.role === role;
+    },
     hasAnyRole: (roles) => roles.includes(currentUser?.role)
   };
 

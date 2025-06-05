@@ -1,18 +1,25 @@
 import axios from 'axios';
 
-// Create an axios instance with default config
+// Use mock data by default for development
+const USE_MOCK = true;
+
+// Base URL configuration
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+
+// Create axios instance with base URL and credentials
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: true,
-  timeout: 10000, // 10 seconds
-  xsrfCookieName: 'csrftoken',
-  xsrfHeaderName: 'X-CSRFToken',
-  withXSRFToken: true,
 });
+
+// Import mock API
+import { mockApi } from './mockApi';
 
 // Add a request interceptor to add the auth token to requests
 api.interceptors.request.use(
@@ -176,52 +183,111 @@ export const del = (url, config = {}) => api.delete(url, config);
 
 // Auth API calls
 export const authApi = {
-  login: (credentials) => post('/auth/login', credentials),
-  register: async (userData) => {
+  login: async (credentials) => {
     try {
-      console.log('Registering user with data:', userData);
-      const response = await post('/auth/register', userData);
-      console.log('Registration successful, response:', response);
-      return response;
+      console.log('Logging in with:', credentials.email);
+      const response = await mockApi.login(credentials);
+      
+      // Handle different response formats
+      const token = response.token || response.data?.token;
+      const user = response.user || response.data?.user;
+      
+      if (token && user) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        // Set axios default auth header
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        return { 
+          data: { 
+            user,
+            token 
+          } 
+        };
+      }
+      
+      throw new Error('Invalid response format from login API');
     } catch (error) {
-      console.error('Registration API error:', {
-        error,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      throw error; // Re-throw to allow component to handle it
-    }
-  },
-  getMe: () => get('/auth/me'),
-  forgotPassword: (email) => post('/auth/forgot-password', { email }),
-  resetPassword: (token, password) => 
-    post(`/auth/reset-password/${token}`, { password }),
-  validateResetToken: (token) => 
-    get(`/auth/validate-reset-token/${token}`),
-  updateProfile: async (userData) => {
-    console.log('Sending update profile request with data:', JSON.stringify(userData, null, 2));
-    try {
-      const response = await put('/auth/me', userData);
-      console.log('Update profile successful, response:', response);
-      return response;
-    } catch (error) {
-      console.error('Update profile error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          data: error.config?.data,
-          headers: error.config?.headers
-        }
-      });
+      console.error('Login error:', error);
       throw error;
     }
   },
+  
+  register: async (userData) => {
+    try {
+      console.log('Registering user with data:', userData);
+      const response = await mockApi.register(userData);
+      
+      // Handle different response formats
+      const token = response.token || response.data?.token;
+      const user = response.user || response.data?.user;
+      
+      if (token && user) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        // Set axios default auth header
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Return consistent response format
+      return { 
+        data: { 
+          success: true,
+          message: 'Registration successful',
+          user,
+          token 
+        } 
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  },
+  
+  getMe: async () => {
+    try {
+      // First check if we have a user in localStorage
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        return { data: JSON.parse(storedUser) };
+      }
+      
+      // If not, try to get from mock API
+      const response = await mockApi.getCurrentUser();
+      if (response.data) {
+        localStorage.setItem('user', JSON.stringify(response.data));
+      }
+      return response;
+    } catch (error) {
+      console.error('Get current user error:', error);
+      throw error;
+    }
+  },
+  
   changePassword: (currentPassword, newPassword) => 
     post('/auth/change-password', { currentPassword, newPassword }),
+    
+  forgotPassword: (email) => post('/auth/forgot-password', { email }),
+  
+  resetPassword: (token, password) => 
+    post(`/auth/reset-password/${token}`, { password }),
+    
+  validateResetToken: (token) => 
+    get(`/auth/validate-reset-token/${token}`),
+    
+  updateProfile: (userData) => {
+    console.log('Updating profile with:', userData);
+    return put('/auth/me', userData);
+  },
+  
+  // Add logout function
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return Promise.resolve();
+  }
 };
 
 // Vendor API calls
@@ -513,116 +579,10 @@ export const organizerApi = {
   },
 };
 
-// Events API calls
-export const eventsApi = {
-  // Existing event endpoints
-  getUpcomingEvents: () => get('/events/upcoming'),
-  getPastEvents: () => get('/events/past'),
-  getSavedEvents: () => get('/events/saved'),
-  searchEvents: (query) => get('/events/search', { params: { q: query } }),
-  getEventDetails: (eventId) => get(`/events/${eventId}`),
-  saveEvent: (eventId) => post(`/events/${eventId}/save`),
-  unsaveEvent: (eventId) => del(`/events/${eventId}/save`),
-  
-  // Enhanced registration endpoint with comprehensive attendee data
-  registerForEvent: (eventId, data) => {
-    // Support both simple and comprehensive registration
-    const registrationData = data.fullName ? data : {
-      fullName: data.name,
-      email: data.email,
-      phoneNumber: data.phone || null,
-      ageRange: data.ageRange || null,
-      location: {
-        city: data.city || null,
-        zipCode: data.zipCode || null,
-      },
-      interests: data.interests || [],
-      ticketType: data.ticketType || 'general',
-      sessionPreferences: data.sessionPreferences || [],
-      dietaryRestrictions: data.dietaryRestrictions || null,
-      accessibilityNeeds: data.accessibilityNeeds || null,
-      socialMediaHandles: data.socialMediaHandles || null,
-      consent: {
-        smsUpdates: data.consent?.smsUpdates || false,
-        behavioralTracking: data.consent?.behavioralTracking || false,
-        socialMedia: data.consent?.socialMedia || false,
-      },
-    };
-    
-    return post(`/events/${eventId}/register`, registrationData);
-  },
-  
-  cancelRegistration: (eventId) => del(`/events/${eventId}/register`),
-  
-  // Enhanced getEventAttendees with filtering support
-  getEventAttendees: (eventId, filters = {}) => {
-    const params = {};
-    if (filters.ageRange) params.ageRange = filters.ageRange;
-    if (filters.location) params.location = JSON.stringify(filters.location);
-    if (filters.interests) params.interests = filters.interests.join(',');
-    if (filters.ticketType) params.ticketType = filters.ticketType;
-    if (filters.sessionId) params.sessionId = filters.sessionId;
-    
-    return get(`/events/${eventId}/attendees`, { params });
-  },
-  
-  getEventVendors: (eventId) => get(`/events/${eventId}/vendors`),
-  getEventSchedule: (eventId) => get(`/events/${eventId}/schedule`),
-  
-  // New attendee-related endpoints
-  checkInToSession: (eventId, sessionId, attendeeId) => 
-    post(`/events/${eventId}/sessions/${sessionId}/check-in`, { attendeeId }),
-  
-  submitFeedback: (eventId, feedbackData) => 
-    post(`/events/${eventId}/feedback`, {
-      attendeeId: feedbackData.attendeeId,
-      ratings: feedbackData.ratings,
-      comments: feedbackData.comments || null,
-    }),
-    
-  trackInteraction: (eventId, interactionData) => 
-    post(`/events/${eventId}/interactions`, {
-      attendeeId: interactionData.attendeeId,
-      type: interactionData.type,
-      details: interactionData.details || {},
-    }),
-    
-  updateRegistration: (eventId, data) => {
-    const updateData = data.fullName ? data : {
-      fullName: data.name,
-      email: data.email,
-      phoneNumber: data.phone || null,
-      ageRange: data.ageRange || null,
-      location: {
-        city: data.city || null,
-        zipCode: data.zipCode || null,
-      },
-      interests: data.interests || [],
-      ticketType: data.ticketType || null,
-      sessionPreferences: data.sessionPreferences || [],
-      dietaryRestrictions: data.dietaryRestrictions || null,
-      accessibilityNeeds: data.accessibilityNeeds || null,
-      socialMediaHandles: data.socialMediaHandles || null,
-      consent: data.consent || {
-        smsUpdates: false,
-        behavioralTracking: false,
-        socialMedia: false,
-      },
-    };
-    
-    return put(`/events/${eventId}/register`, updateData);
-  },
-  
-  // Additional attendee management
-  getAttendeeProfile: (eventId, attendeeId) => 
-    get(`/events/${eventId}/attendees/${attendeeId}`),
-    
-  getAttendeeSessions: (eventId, attendeeId) => 
-    get(`/events/${eventId}/attendees/${attendeeId}/sessions`),
-    
-  updateAttendeeStatus: (eventId, attendeeId, status) => 
-    put(`/events/${eventId}/attendees/${attendeeId}/status`, { status }),
-};
+// Import events API implementation
+import { eventsApi } from './eventsApi';
+
+export { eventsApi };
 
 // Messages API calls
 export const messagesApi = {
