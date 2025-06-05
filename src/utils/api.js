@@ -247,18 +247,113 @@ export const organizerApi = {
 
 // Events API calls
 export const eventsApi = {
+  // Existing event endpoints
   getUpcomingEvents: () => get('/events/upcoming'),
   getPastEvents: () => get('/events/past'),
   getSavedEvents: () => get('/events/saved'),
-  searchEvents: (query) => get('/events/search', { params: { query } }),
+  searchEvents: (query) => get('/events/search', { params: { q: query } }),
   getEventDetails: (eventId) => get(`/events/${eventId}`),
   saveEvent: (eventId) => post(`/events/${eventId}/save`),
   unsaveEvent: (eventId) => del(`/events/${eventId}/save`),
-  registerForEvent: (eventId, data) => post(`/events/${eventId}/register`, data),
+  
+  // Enhanced registration endpoint with comprehensive attendee data
+  registerForEvent: (eventId, data) => {
+    // Support both simple and comprehensive registration
+    const registrationData = data.fullName ? data : {
+      fullName: data.name,
+      email: data.email,
+      phoneNumber: data.phone || null,
+      ageRange: data.ageRange || null,
+      location: {
+        city: data.city || null,
+        zipCode: data.zipCode || null,
+      },
+      interests: data.interests || [],
+      ticketType: data.ticketType || 'general',
+      sessionPreferences: data.sessionPreferences || [],
+      dietaryRestrictions: data.dietaryRestrictions || null,
+      accessibilityNeeds: data.accessibilityNeeds || null,
+      socialMediaHandles: data.socialMediaHandles || null,
+      consent: {
+        smsUpdates: data.consent?.smsUpdates || false,
+        behavioralTracking: data.consent?.behavioralTracking || false,
+        socialMedia: data.consent?.socialMedia || false,
+      },
+    };
+    
+    return post(`/events/${eventId}/register`, registrationData);
+  },
+  
   cancelRegistration: (eventId) => del(`/events/${eventId}/register`),
-  getEventAttendees: (eventId) => get(`/events/${eventId}/attendees`),
+  
+  // Enhanced getEventAttendees with filtering support
+  getEventAttendees: (eventId, filters = {}) => {
+    const params = {};
+    if (filters.ageRange) params.ageRange = filters.ageRange;
+    if (filters.location) params.location = JSON.stringify(filters.location);
+    if (filters.interests) params.interests = filters.interests.join(',');
+    if (filters.ticketType) params.ticketType = filters.ticketType;
+    if (filters.sessionId) params.sessionId = filters.sessionId;
+    
+    return get(`/events/${eventId}/attendees`, { params });
+  },
+  
   getEventVendors: (eventId) => get(`/events/${eventId}/vendors`),
-  getEventSchedule: (eventId) => get(`/events/${eventId}/schedule`)
+  getEventSchedule: (eventId) => get(`/events/${eventId}/schedule`),
+  
+  // New attendee-related endpoints
+  checkInToSession: (eventId, sessionId, attendeeId) => 
+    post(`/events/${eventId}/sessions/${sessionId}/check-in`, { attendeeId }),
+  
+  submitFeedback: (eventId, feedbackData) => 
+    post(`/events/${eventId}/feedback`, {
+      attendeeId: feedbackData.attendeeId,
+      ratings: feedbackData.ratings,
+      comments: feedbackData.comments || null,
+    }),
+    
+  trackInteraction: (eventId, interactionData) => 
+    post(`/events/${eventId}/interactions`, {
+      attendeeId: interactionData.attendeeId,
+      type: interactionData.type,
+      details: interactionData.details || {},
+    }),
+    
+  updateRegistration: (eventId, data) => {
+    const updateData = data.fullName ? data : {
+      fullName: data.name,
+      email: data.email,
+      phoneNumber: data.phone || null,
+      ageRange: data.ageRange || null,
+      location: {
+        city: data.city || null,
+        zipCode: data.zipCode || null,
+      },
+      interests: data.interests || [],
+      ticketType: data.ticketType || null,
+      sessionPreferences: data.sessionPreferences || [],
+      dietaryRestrictions: data.dietaryRestrictions || null,
+      accessibilityNeeds: data.accessibilityNeeds || null,
+      socialMediaHandles: data.socialMediaHandles || null,
+      consent: data.consent || {
+        smsUpdates: false,
+        behavioralTracking: false,
+        socialMedia: false,
+      },
+    };
+    
+    return put(`/events/${eventId}/register`, updateData);
+  },
+  
+  // Additional attendee management
+  getAttendeeProfile: (eventId, attendeeId) => 
+    get(`/events/${eventId}/attendees/${attendeeId}`),
+    
+  getAttendeeSessions: (eventId, attendeeId) => 
+    get(`/events/${eventId}/attendees/${attendeeId}/sessions`),
+    
+  updateAttendeeStatus: (eventId, attendeeId, status) => 
+    put(`/events/${eventId}/attendees/${attendeeId}/status`, { status }),
 };
 
 // Messages API calls
