@@ -13,6 +13,7 @@ const OrganizerDashboard = lazy(() => import('../components/organizer/dashboard/
 const EventDetail = lazy(() => import('../components/organizer/EventDetail'));
 const VendorSelection = lazy(() => import('../components/organizer/VendorSelection'));
 const VendorEvents = lazy(() => import('../components/VendorEvents'));
+const VendorDashboard = lazy(() => import('../components/Vendor/dashboard/VendorDashboard'));
 const AttendeeDashboard = lazy(() => import('../components/attendee/dashboard/AttendeeDashboard'));
 const Profile = lazy(() => import('../components/common/Profile'));
 const Messaging = lazy(() => import('../components/Messaging'));
@@ -94,13 +95,28 @@ export const protectedRoutes = [
   // Vendor routes
   {
     path: '/vendor',
+    element: <Navigate to="dashboard" replace />,
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/dashboard',
+    element: <VendorDashboard />,
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/events',
     element: <VendorEvents />,
-    roles: ['vendor'],
-    children: [
-      { path: 'dashboard', element: <VendorEvents /> },
-      { path: 'events', element: <VendorEvents /> },
-      { path: '*', element: <Navigate to="dashboard" replace /> }
-    ]
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/availability',
+    element: <div>Vendor Availability</div>,
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/services',
+    element: <div>Vendor Services</div>,
+    roles: ['vendor']
   },
   
   // Attendee routes

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { vendorApi } from '../../../utils/api';
-import StatsCard from '../common/StatsCard';
+import StatsCard from '../../common/StatsCard';
 import UpcomingBookings from './UpcomingBookings';
 import AvailabilityCalendar from './AvailabilityCalendar';
 import RecentMessages from './RecentMessages';
@@ -20,33 +20,43 @@ const VendorDashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        // In a real app, you would fetch this data from your API
-        const [bookingsResponse, availabilityResponse] = await Promise.all([
-          vendorApi.getEvents(),
-          vendorApi.getAvailability(),
+        setError('');
+        
+        // Fetch events and availability in parallel
+        const [eventsResponse, availabilityResponse] = await Promise.all([
+          vendorApi.getEvents().catch(err => {
+            console.warn('Error fetching events:', err);
+            return { data: [] }; // Return empty array on error
+          }),
+          vendorApi.getAvailability().catch(err => {
+            console.warn('Error fetching availability:', err);
+            return { data: [] }; // Return empty array on error
+          })
         ]);
 
-        const bookings = Array.isArray(bookingsResponse) ? bookingsResponse : (bookingsResponse?.data || []);
-        const availability = Array.isArray(availabilityResponse) ? availabilityResponse : (availabilityResponse?.data || []);
+        // Extract data from responses
+        const events = Array.isArray(eventsResponse?.data) ? eventsResponse.data : [];
+        const availability = Array.isArray(availabilityResponse?.data) ? availabilityResponse.data : [];
         
         const now = new Date();
-        const upcoming = bookings.filter(booking => new Date(booking.startDate) > now);
+        const upcoming = events.filter(event => new Date(event.startDate) > now);
         
-        // Calculate response rate (mock data)
-        const responseRate = Math.min(100, Math.max(0, Math.floor(Math.random() * 100)));
+        // Calculate response rate (mock data for now)
+        const responseRate = availability.length > 0 ? 
+          Math.min(100, Math.max(0, Math.floor(Math.random() * 100))) : 0;
         
-        // Calculate earnings (mock data)
-        const totalEarnings = bookings.reduce((sum, booking) => sum + (booking.price || 0), 0);
+        // Calculate earnings (mock data for now)
+        const totalEarnings = events.reduce((sum, event) => sum + (event.price || 0), 0);
 
         setStats({
-          totalBookings: bookings.length,
+          totalBookings: events.length,
           upcomingBookings: upcoming.length,
           totalEarnings,
           responseRate,
         });
       } catch (err) {
-        console.error('Error fetching vendor dashboard data:', err);
-        setError('Failed to load dashboard data. Please try again later.');
+        console.error('Error in vendor dashboard data processing:', err);
+        setError('Failed to process dashboard data. Some features may be limited.');
       } finally {
         setLoading(false);
       }
