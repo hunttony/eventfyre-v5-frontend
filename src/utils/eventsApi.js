@@ -5,56 +5,75 @@ import { mockApi } from './mockApi';
 const USE_MOCK = true;
 
 // Helper function to handle mock API responses
-const handleMockResponse = async (mockFn, mockData) => {
-  if (USE_MOCK) {
-    try {
-      const response = await mockFn();
-      return response.data || response;
-    } catch (error) {
-      console.error('Mock API error:', error);
-      throw error;
+const handleMockResponse = async (mockFn) => {
+  if (!USE_MOCK) return null;
+  
+  try {
+    const response = await mockFn();
+    // If the response already has a data property, return it as is
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response;
     }
+    // Otherwise wrap the response in a data property
+    return { data: response };
+  } catch (error) {
+    console.error('Mock API error:', error);
+    throw error;
   }
-  return null;
 };
 
 export const eventsApi = {
   // Get upcoming events
   getUpcomingEvents: async () => {
-    // Get current user from localStorage
-    const user = JSON.parse(localStorage.getItem('user'));
-    const userRole = user?.role || 'attendee';
-    
-    // Get mock response
-    let mockResponse;
-    
-    if (userRole === 'organizer') {
-      // For organizers, return all upcoming events they've created
-      mockResponse = await handleMockResponse(mockApi.getOrganizerEvents);
-    } else if (userRole === 'vendor') {
-      // For vendors, return events they're participating in
-      mockResponse = await handleMockResponse(mockApi.getVendorEvents);
-    } else {
-      // For attendees, return all public upcoming events
-      mockResponse = await handleMockResponse(mockApi.getUpcomingEvents);
+    try {
+      // Get current user from localStorage
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userRole = user?.role || 'attendee';
+      
+      // Get appropriate mock function based on user role
+      let mockFn;
+      if (userRole === 'organizer') {
+        mockFn = mockApi.getOrganizerEvents;
+      } else if (userRole === 'vendor') {
+        mockFn = mockApi.getVendorEvents;
+      } else {
+        mockFn = mockApi.getUpcomingEvents;
+      }
+      
+      // Get mock response
+      const mockResponse = await handleMockResponse(mockFn);
+      if (mockResponse) return mockResponse;
+      
+      // Fallback to real API if mock is disabled
+      return get('/events/upcoming');
+    } catch (error) {
+      console.error('Error in getUpcomingEvents:', error);
+      return { data: { events: [], total: 0, page: 1, limit: 10 } };
     }
-    
-    if (mockResponse !== null) return mockResponse;
-    return get('/events/upcoming');
   },
 
   // Get past events
   getPastEvents: async () => {
-    const mockResponse = await handleMockResponse(mockApi.getPastEvents);
-    if (mockResponse !== null) return mockResponse;
-    return get('/events/past');
+    try {
+      const mockResponse = await handleMockResponse(mockApi.getPastEvents);
+      if (mockResponse) return mockResponse;
+      return get('/events/past');
+    } catch (error) {
+      console.error('Error in getPastEvents:', error);
+      return { data: { events: [], total: 0, page: 1, limit: 10 } };
+    }
   },
 
   // Get saved events
   getSavedEvents: async () => {
-    const mockResponse = await handleMockResponse(mockApi.getSavedEvents);
-    if (mockResponse !== null) return mockResponse;
-    return get('/events/saved');
+    try {
+      const mockResponse = await handleMockResponse(mockApi.getSavedEvents);
+      if (mockResponse) return mockResponse;
+      return get('/events/saved');
+    } catch (error) {
+      console.error('Error in getSavedEvents:', error);
+      return { data: { events: [], total: 0, page: 1, limit: 10 } };
+    }
   },
 
   // Search events

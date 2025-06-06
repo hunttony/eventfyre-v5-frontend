@@ -33,14 +33,17 @@ const AttendeeDashboard = () => {
     }
   }, [feedbackSuccess]);
   
-  // Calculate stats
+  // Calculate stats with defensive programming
   const stats = {
-    upcomingEvents: events.upcoming.length,
-    pastEvents: events.past.length,
-    savedEvents: events.saved.length,
-    totalSessions: events.upcoming.reduce(
-      (total, event) => total + (event.sessions?.length || 0), 0
-    )
+    upcomingEvents: Array.isArray(events.upcoming) ? events.upcoming.length : 0,
+    pastEvents: Array.isArray(events.past) ? events.past.length : 0,
+    savedEvents: Array.isArray(events.saved) ? events.saved.length : 0,
+    totalSessions: Array.isArray(events.upcoming) 
+      ? events.upcoming.reduce(
+          (total, event) => total + (event?.sessions?.length || 0), 
+          0
+        )
+      : 0
   };
   
   // Memoize toggle save handler

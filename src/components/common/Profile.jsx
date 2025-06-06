@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authApi } from '../../utils/api';
 import { XCircleIcon, PencilIcon } from '@heroicons/react/24/outline';
@@ -11,111 +11,93 @@ const Profile = () => {
     phone: '',
     bio: '',
     company: '',
-    location: ''
+    location: '',
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const initialLoad = useRef(true);
 
-  // Fetch profile data on component mount
+  // Fetch profile data on component mount and when currentUser changes
   useEffect(() => {
     const fetchProfile = async () => {
+      if (!currentUser) {
+        setIsLoading(false);
+        setError('Please log in to view your profile.');
+        return;
+      }
+  
       try {
         setIsLoading(true);
         const response = await authApi.getMe();
-        console.log('Fetched profile data:', response); // Debug log
         
-        if (response?.data?.userData) {
-          const userData = response.data.userData;
-          console.log('User data from API:', userData); // Debug log
-          
-          setFormData({
-            name: userData.name || '',
-            email: userData.email || '',
-            phone: userData.phone || '',
-            bio: userData.bio || '',
-            company: userData.company || '',
-            location: userData.location || ''
-          });
+        if (!response?.success || !response?.data) {
+          throw new Error(response?.message || 'Failed to fetch profile data');
         }
+  
+        const userData = response.data;
+        setFormData({
+          name: userData.name || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          bio: userData.bio || '',
+          company: userData.company || '',
+          location: userData.location || '',
+        });
       } catch (err) {
         console.error('Profile fetch error:', err);
-        setError('Failed to load profile data. Please try again later.');
+        setError(err.message || 'Failed to load profile data');
       } finally {
         setIsLoading(false);
       }
     };
-
+  
     fetchProfile();
-  }, [currentUser]);
+  }, [currentUser?.id]); // Only re-run if currentUser.id changes
 
   const handleInputChange = (e) => {
     const { name, value, type, files } = e.target;
-    
-    if (type === 'file') {
-      setFormData(prev => ({
-        ...prev,
-        [name]: files[0]
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'file' ? files[0] : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
-
+  
     try {
       setIsSubmitting(true);
       setError('');
-      
-      // Create FormData object for file uploads if needed
-      const formDataToSend = new FormData();
-      
-      // Only append fields that exist in the form
-      const fields = ['name', 'email', 'phone', 'bio', 'company', 'location'];
-      fields.forEach(field => {
-        if (formData[field] !== undefined && formData[field] !== null) {
-          formDataToSend.append(field, formData[field]);
-        }
-      });
-
-      console.log('Submitting form data:', Object.fromEntries(formDataToSend)); // Debug log
-      
-      const response = await authApi.updateProfile(formDataToSend);
-      console.log('Update response:', response); // Debug log
-      
-      if (response?.data?.userData) {
-        const updatedUser = response.data.userData;
-        
-        // Update local state with the response data
-        setFormData({
-          name: updatedUser.name || '',
-          email: updatedUser.email || '',
-          phone: updatedUser.phone || '',
-          bio: updatedUser.bio || '',
-          company: updatedUser.company || '',
-          location: updatedUser.location || ''
-        });
-        
-        // Update auth context
-        updateUser(updatedUser);
-        
-        // Show success message and exit edit mode
-        setError('Profile updated successfully!');
-        setTimeout(() => setError(''), 3000); // Clear success message after 3 seconds
-        setIsEditing(false);
-      } else {
-        throw new Error('No user data in response');
+  
+      if (!currentUser) {
+        throw new Error('Please log in to update your profile.');
       }
+  
+      const response = await authApi.updateProfile({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        bio: formData.bio,
+        company: formData.company,
+        location: formData.location,
+      });
+  
+      if (!response?.success) {
+        throw new Error(response?.message || 'Failed to update profile');
+      }
+  
+      // Update the auth context with the new data
+      updateUser(response.data);
+      
+      setError('Profile updated successfully!');
+      setTimeout(() => setError(''), 3000);
+      setIsEditing(false);
     } catch (err) {
       console.error('Update error:', err);
-      setError(err.response?.data?.message || 'Failed to update profile. Please try again.');
+      setError(err.message || 'Failed to update profile');
     } finally {
       setIsSubmitting(false);
     }
@@ -154,7 +136,7 @@ const Profile = () => {
             {!isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <PencilIcon className="-ml-1 mr-2 h-4 w-4" aria-hidden="true" />
                 Edit Profile
@@ -164,13 +146,20 @@ const Profile = () => {
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 m-4 rounded">
+          <div
+            className={`${
+              error.includes('successfully') ? 'bg-green-50 border-l-4 border-green-400' : 'bg-red-50 border-l-4 border-red-400'
+            } p-4 m-4 rounded`}
+          >
             <div className="flex">
               <div className="flex-shrink-0">
-                <XCircleIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
+                <XCircleIcon
+                  className={`h-5 w-5 ${error.includes('successfully') ? 'text-green-400' : 'text-red-400'}`}
+                  aria-hidden="true"
+                />
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+                <p className={`text-sm ${error.includes('successfully') ? 'text-green-600' : 'text-red-700'}`}>{error}</p>
               </div>
             </div>
           </div>
@@ -190,7 +179,7 @@ const Profile = () => {
                   required
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
                 />
               </div>
 
@@ -204,7 +193,8 @@ const Profile = () => {
                   id="email"
                   value={formData.email}
                   readOnly
-                  className="mt-1 block w-full border border-gray-300 bg-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm cursor-not-allowed"
+                  disabled
+                  className="mt-1 block w-full border border-gray-300 bg-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm cursor-not-allowed"
                 />
               </div>
 
@@ -218,7 +208,7 @@ const Profile = () => {
                   id="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
@@ -233,7 +223,7 @@ const Profile = () => {
                   id="company"
                   value={formData.company}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
                 />
               </div>
 
@@ -247,7 +237,7 @@ const Profile = () => {
                   id="location"
                   value={formData.location}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
                   placeholder="City, Country"
                 />
               </div>
@@ -262,7 +252,7 @@ const Profile = () => {
                   rows={4}
                   value={formData.bio}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
                   placeholder="Tell us about yourself..."
                 />
               </div>
@@ -274,14 +264,14 @@ const Profile = () => {
                     setIsEditing(false);
                     setError('');
                   }}
-                  className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
                   disabled={isSubmitting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                  className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-900 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 ${
                     isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
                   }`}
                   disabled={isSubmitting}

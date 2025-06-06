@@ -171,6 +171,36 @@ const EventList = ({
     past: 'Past',
   };
 
+  // Format location object or string for display
+  const formatLocation = (location) => {
+    if (!location) return 'Location not specified';
+    
+    // If location is a string, return it as is
+    if (typeof location === 'string') return location;
+    
+    // If location is an object, format the address parts
+    const { venue, address, city, state, zip, country } = location;
+    const parts = [];
+    
+    if (venue) parts.push(venue);
+    if (address) parts.push(address);
+    
+    const cityStateZip = [];
+    if (city) cityStateZip.push(city);
+    if (state) cityStateZip.push(state);
+    if (zip) cityStateZip.push(zip);
+    
+    if (cityStateZip.length > 0) {
+      parts.push(cityStateZip.join(', '));
+    }
+    
+    if (country && country !== 'United States') {
+      parts.push(country);
+    }
+    
+    return parts.length > 0 ? parts.join(' • ') : 'Location not specified';
+  };
+
   // Handle empty state
   if (!loading && (!localEvents || localEvents.length === 0)) {
     return (
@@ -322,7 +352,7 @@ e.target.src = `https://picsum.photos/seed/fallback-${seed}/400/200`;
                           d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                         />
                       </svg>
-                      <span className="line-clamp-1">{event.location}</span>
+                      <span className="line-clamp-1">{formatLocation(event.location)}</span>
                     </div>
                   )}
                 </div>

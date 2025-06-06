@@ -23,24 +23,24 @@ export const AttendeeProvider = ({ children }) => {
       const [upcoming, past, saved] = await Promise.all([
         eventsApi.getUpcomingEvents().catch(err => {
           console.error('Error fetching upcoming events:', err);
-          return { data: [] }; // Return empty array on error
+          return { data: { events: [] } }; // Return empty array on error
         }),
         eventsApi.getPastEvents().catch(err => {
           console.error('Error fetching past events:', err);
-          return { data: [] }; // Return empty array on error
+          return { data: { events: [] } }; // Return empty array on error
         }),
         eventsApi.getSavedEvents().catch(err => {
           console.error('Error fetching saved events:', err);
-          return { data: [] }; // Return empty array on error
+          return { data: { events: [] } }; // Return empty array on error
         })
       ]);
       
       console.log('Fetched events:', { upcoming, past, saved });
       
       setEvents({
-        upcoming: upcoming?.data || [],
-        past: past?.data || [],
-        saved: saved?.data || []
+        upcoming: upcoming?.data?.events || [],
+        past: past?.data?.events || [],
+        saved: saved?.data?.events || []
       });
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || 'Failed to fetch events';

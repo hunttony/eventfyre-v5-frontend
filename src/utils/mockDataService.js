@@ -267,29 +267,48 @@ const mockUsers = {
 // Mock API implementation
 const mockApi = {
   // Event-related endpoints
-  getUpcomingEvents() {
-    const upcoming = mockEvents.filter(event => new Date(event.endDate) > new Date());
-    return mockApiCall({
-      success: true,
-      data: {
-        events: upcoming,
-        total: upcoming.length,
-        page: 1,
-        limit: 10
-      }
-    });
+  getUpcomingEvents: () => {
+    try {
+      const now = new Date();
+      const upcomingEvents = mockEvents.filter(event => {
+        const eventDate = new Date(event.startDate);
+        return eventDate > now;
+      });
+      
+      return mockApiCall({
+        data: {
+          events: upcomingEvents,
+          total: upcomingEvents.length,
+          page: 1,
+          limit: 10
+        }
+      });
+    } catch (error) {
+      console.error('Error getting upcoming events:', error);
+      return mockApiCall({ data: { events: [], total: 0, page: 1, limit: 10 } });
+    }
   },
-  getPastEvents() {
-    const past = mockEvents.filter(event => new Date(event.endDate) <= new Date());
-    return mockApiCall({
-      success: true,
-      data: {
-        events: past,
-        total: past.length,
-        page: 1,
-        limit: 10
-      }
-    });
+  
+  getPastEvents: () => {
+    try {
+      const now = new Date();
+      const pastEvents = mockEvents.filter(event => {
+        const eventDate = new Date(event.endDate || event.startDate);
+        return eventDate < now;
+      });
+      
+      return mockApiCall({
+        data: {
+          events: pastEvents,
+          total: pastEvents.length,
+          page: 1,
+          limit: 10
+        }
+      });
+    } catch (error) {
+      console.error('Error getting past events:', error);
+      return mockApiCall({ data: { events: [], total: 0, page: 1, limit: 10 } });
+    }
   },
   getSavedEvents() {
     // Return a subset of upcoming events as saved events
@@ -413,51 +432,108 @@ const mockApi = {
   
   // Get current user
   getCurrentUser: () => {
-    // Get user from localStorage or return a default attendee
-    const user = JSON.parse(localStorage.getItem('user') || 'null') || mockUsers.attendee;
-    return mockApiCall({
-      success: true,
-      user
-    });
+    try {
+      const userJson = localStorage.getItem('user');
+      if (!userJson) {
+        return mockApiCall({ error: 'No user found' }, null, 401);
+      }
+      const user = JSON.parse(userJson);
+      return mockApiCall({ data: user });
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return mockApiCall(null, { message: 'Failed to get current user' }, 500);
+    }
+  },
+  
+  updateProfile: async (formData) => {
+    try {
+      // Get current user from localStorage
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!currentUser || !currentUser.id) {
+        return mockApiCall(null, { message: 'User not authenticated' }, 401);
+      }
+
+      // Convert FormData to plain object if it's a FormData instance
+      let updateData = formData;
+      if (formData instanceof FormData) {
+        updateData = {};
+        for (let [key, value] of formData.entries()) {
+          updateData[key] = value;
+        }
+      }
+      
+      // Update user data
+      const updatedUser = {
+        ...currentUser,
+        ...updateData,
+        // Preserve important fields that shouldn't be overwritten
+        id: currentUser.id,
+        role: currentUser.role,
+        token: currentUser.token
+      };
+      
+      // Update localStorage
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      // Return updated user data
+      return mockApiCall({
+        success: true,
+        message: 'Profile updated successfully',
+        user: updatedUser,
+        userData: updatedUser // Keep for backward compatibility
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      return mockApiCall(null, { message: 'Failed to update profile' }, 500);
+    }
   },
   
   // Get organizer events (for organizers)
   getOrganizerEvents: () => {
-    // Filter events where the current user is the organizer
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const organizerEvents = mockEvents.filter(event => 
-      event.organizerId === user.id || event.organizerId === 'org-1'
-    );
-    
-    return mockApiCall({
-      success: true,
-      data: {
-        events: organizerEvents,
-        total: organizerEvents.length,
-        page: 1,
-        limit: 10
-      }
-    });
+    try {
+      // Filter events where the current user is the organizer
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const organizerEvents = mockEvents.filter(event => 
+        event.organizerId === user.id || event.organizerId === 'org-1'
+      );
+      
+      return mockApiCall({
+        data: {
+          events: organizerEvents,
+          total: organizerEvents.length,
+          page: 1,
+          limit: 10
+        }
+      });
+    } catch (error) {
+      console.error('Error getting organizer events:', error);
+      return mockApiCall({ data: { events: [], total: 0, page: 1, limit: 10 } });
+    }
   },
   
   // Get vendor events (for vendors)
   getVendorEvents: () => {
-    // Filter events where the current vendor is participating
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const vendorEvents = mockEvents.filter(event => 
-      event.vendors?.some(v => v.id === user.id) || 
-      event.vendors?.some(v => v.id === 'vendor-1')
-    );
-    
-    return mockApiCall({
-      success: true,
-      data: {
-        events: vendorEvents,
-        total: vendorEvents.length,
-        page: 1,
-        limit: 10
-      }
-    });
+    try {
+      // Filter events where the current vendor is participating
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const vendorEvents = mockEvents.filter(event => 
+        event.vendors?.some(v => v.id === user.id) || 
+        event.vendors?.some(v => v.id === 'vendor-1')
+      );
+      
+      return mockApiCall({
+        data: {
+          events: vendorEvents,
+          total: vendorEvents.length,
+          page: 1,
+          limit: 10
+        }
+      });
+    } catch (error) {
+      console.error('Error getting vendor events:', error);
+      return mockApiCall({ data: { events: [], total: 0, page: 1, limit: 10 } });
+    }
   },
   
   // Attendee-related endpoints

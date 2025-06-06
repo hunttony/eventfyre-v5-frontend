@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { authApi } from '../utils/api';
 import axios from 'axios';
 
@@ -22,37 +22,28 @@ export function AuthProvider({ children }) {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
-      
+
       if (storedToken && storedUser) {
         try {
           // Set the token in axios defaults
           axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-          
-          // Try to validate the token by fetching fresh user data
-          try {
-            const response = await authApi.getMe();
-            setCurrentUser(response.user);
-            // Update stored user data
-            localStorage.setItem('user', JSON.stringify(response.user));
-          } catch (error) {
-            console.error('Error validating token, using stored user data:', error);
-            // If token validation fails but we have stored user data, use it
-            setCurrentUser(JSON.parse(storedUser));
-          }
+
+          // Validate token by fetching fresh user data
+          const response = await authApi.getMe();
+          setCurrentUser(response.data);
+          // Update stored user data
+          localStorage.setItem('user', JSON.stringify(response.data));
         } catch (error) {
-          console.error('Error initializing auth:', error);
-          // Clear invalid data
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          delete axios.defaults.headers.common['Authorization'];
-          setCurrentUser(null);
+          console.error('Error validating token, using stored user data:', error);
+          // Fallback to stored user data
+          setCurrentUser(JSON.parse(storedUser));
         }
       } else if (storedToken) {
-        // We have a token but no stored user, try to fetch user data
+        // Have token but no user, fetch user data
         try {
           const response = await authApi.getMe();
-          setCurrentUser(response.user);
-          localStorage.setItem('user', JSON.stringify(response.user));
+          setCurrentUser(response.data);
+          localStorage.setItem('user', JSON.stringify(response.data));
         } catch (error) {
           console.error('Error fetching user data:', error);
           // Clear invalid token
@@ -64,10 +55,10 @@ export function AuthProvider({ children }) {
         // No token, ensure clean state
         setCurrentUser(null);
       }
-      
+
       setLoading(false);
     };
-    
+
     initializeAuth();
   }, []);
 
@@ -86,123 +77,126 @@ export function AuthProvider({ children }) {
    * Logs in a user
    * @param {string} email - User's email
    * @param {string} password - User's password
-   * @returns {Promise<void>}
+   * @returns {Promise<{ success: boolean, user?: import('../types/user').User, error?: string }>}
    */
   const login = async (email, password) => {
     try {
-      const response = await authApi.login({ email, password });
-      console.log('Login response:', response); // Debug log
-      
-      // Handle different response formats
-      let token, user;
-      
-      // Case 1: Response has token and user at top level
-      if (response.token && response.user) {
-        ({ token, user } = response);
-        
-        // Store user in localStorage
-        localStorage.setItem('user', JSON.stringify(user));
-      } else if (response.data?.token && response.data?.user) {
-        // Standard response format from our mock API
-        ({ token, user } = response.data);
-      } else {
-        console.error('Unexpected response format:', response);
-        throw new Error('Invalid response format from server');
+      // Validate input
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error('Valid email is required');
       }
-      
+      if (!password || password.length < 8) {
+        throw new Error('Password must be at least 8 characters');
+      }
+
+      const response = await authApi.login({ email, password });
+      console.log('Login response:', response);
+
+      const { token, user } = response.data || {};
       if (!token || !user) {
         throw new Error('Missing token or user data in response');
       }
-      
+
       // Ensure user has a role, default to 'attendee' if not set
       if (!user.role) {
         console.warn('User role not set, defaulting to attendee');
         user.role = 'attendee';
       }
-      
-      // Store token and user in localStorage
+
+      // Store in localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-      
+
+      // Update axios headers
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
       // Update state
       setToken(token);
       setCurrentUser(user);
-      
+
       console.log('User logged in with role:', user.role);
       return { success: true, user };
     } catch (error) {
       console.error('Login error:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message || 'Login failed. Please try again.' 
+      return {
+        success: false,
+        error: error.message || 'Login failed. Please try again.'
       };
     }
   };
 
+  /**
+   * Registers a new user
+   * @param {Object} userData - User data (email, password, name, etc.)
+   * @returns {Promise<{ success: boolean, user?: import('../types/user').User, error?: string }>}
+   */
   const register = async (userData) => {
     try {
+      // Validate input
+      if (!userData?.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) {
+        throw new Error('Valid email is required');
+      }
+      if (!userData?.password || userData.password.length < 8) {
+        throw new Error('Password must be at least 8 characters');
+      }
+      if (!userData?.name) {
+        throw new Error('Name is required');
+      }
+
       console.log('Starting registration with data:', userData);
       const response = await authApi.register(userData);
       console.log('Registration response:', response);
-      
-      // Handle response format
-      let token, user;
-      
-      if (response.data?.token && response.data?.user) {
-        // Standard response format from our mock API
-        ({ token, user } = response.data);
-      } else if (response.token && response.user) {
-        // Alternative format
-        ({ token, user } = response);
-      } else {
-        console.error('Unexpected response format:', response);
-        throw new Error('Invalid response format from server');
-      }
-      
+
+      const { token, user } = response.data || {};
       if (!token || !user) {
         throw new Error('Missing token or user data in response');
       }
-      
+
       // Ensure user has a role, default to 'attendee' if not set
       if (!user.role) {
         user.role = userData.role || 'attendee';
       }
-      
-      // Store token and user in localStorage
+
+      // Store in localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-      
+
       // Update state
       setToken(token);
       setCurrentUser(user);
-      
+
       console.log('User registered with role:', user.role);
       return { success: true, user };
     } catch (error) {
       console.error('Registration error:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message || 'Registration failed. Please try again.' 
+      return {
+        success: false,
+        error: error.message || 'Registration failed. Please try again.'
       };
     }
   };
 
   /**
    * Logs out the current user
-   * @returns {void}
+   * @returns {Promise<{ success: boolean, error?: string }>}
    */
-  const logout = () => {
-    // Clear all auth-related data
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
-    
-    // Reset state
-    setToken(null);
-    setCurrentUser(null);
-    
-    // Optionally call backend logout endpoint if you have one
-    // await axios.post('/api/v1/auth/logout');
+  const logout = async () => {
+    try {
+      const response = await authApi.logout();
+      // Reset state
+      setToken(null);
+      setCurrentUser(null);
+      return response;
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Ensure state is cleared even if API call fails
+      setToken(null);
+      setCurrentUser(null);
+      return {
+        success: false,
+        error: error.message || 'Logout failed'
+      };
+    }
   };
 
   /**
@@ -210,12 +204,16 @@ export function AuthProvider({ children }) {
    * @param {Partial<import('../types/user').User>} userData - Partial user data to update
    * @returns {void}
    */
-  const updateUser = (userData) => {
-    setCurrentUser(prev => ({
-      ...prev,
-      ...userData
-    }));
-  };
+  // In your AuthContext.jsx
+const updateUser = useCallback((userData) => {
+  setCurrentUser(prev => {
+    // Only update if data has actually changed
+    if (JSON.stringify(prev) === JSON.stringify(userData)) {
+      return prev;
+    }
+    return { ...prev, ...userData };
+  });
+}, []);
 
   const value = {
     currentUser,

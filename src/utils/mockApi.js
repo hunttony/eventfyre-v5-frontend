@@ -67,20 +67,32 @@ const mockApi = {
   // Event listing endpoints
   getUpcomingEvents: async () => {
     console.log('[mockApi] Getting upcoming events');
-    const result = await handleMockCall('getUpcomingEvents');
-    console.log('[mockApi] Upcoming events result:', result);
-    return result;
+    try {
+      const result = await mockDataService.getUpcomingEvents();
+      console.log('[mockApi] Upcoming events result:', result);
+      return result;
+    } catch (error) {
+      console.error('[mockApi] Error getting upcoming events:', error);
+      return { data: [] }; // Return empty array on error
+    }
   },
+  
   getPastEvents: async () => {
     console.log('[mockApi] Getting past events');
-    const result = await handleMockCall('getPastEvents');
-    console.log('[mockApi] Past events result:', result);
-    return result;
+    try {
+      const result = await mockDataService.getPastEvents();
+      console.log('[mockApi] Past events result:', result);
+      return result;
+    } catch (error) {
+      console.error('[mockApi] Error getting past events:', error);
+      return { data: [] }; // Return empty array on error
+    }
   },
+  
   getSavedEvents: async () => {
     console.log('[mockApi] Getting saved events');
     try {
-      const result = await handleMockCall('getSavedEvents');
+      const result = await mockDataService.getSavedEvents();
       console.log('[mockApi] Saved events result:', result);
       return result;
     } catch (error) {
