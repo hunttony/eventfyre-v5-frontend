@@ -274,8 +274,8 @@ export const authApi = {
 
   register: async (userData) => {
     try {
-      if (!userData?.email || !userData?.password || !userData?.name) {
-        throw new Error('Email, password, and name are required');
+      if (!userData?.email || !userData?.password || !userData?.name || !userData?.role) {
+        throw new Error('Email, password, name, and role are required');
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) {
         throw new Error('Valid email is required');
@@ -287,6 +287,51 @@ export const authApi = {
       console.log('Registering user with data:', userData);
       const response = await post('/auth/register', userData);
       const { token, refreshToken, user } = response.data || {};
+      console.log('Register response:', response);
+
+      // Handle role-specific profile creation based on backend expectations
+      // Valid roles are: 'vendor', 'organizer', 'admin' (from types/user.d.ts)
+      try {
+        // Only create profile if we have a valid token
+        if (token) {
+          switch (userData.role) {
+            case 'organizer':
+              await post('/organizer/profile', {
+                name: userData.name,
+                email: userData.email,
+                phone: userData.phone || '',
+                website: '',
+                description: '',
+                socialMedia: {}
+              });
+              console.log('Default organizer profile created');
+              break;
+
+            case 'vendor':
+              await post('/vendor/profile', {
+                name: userData.name,
+                email: userData.email,
+                phone: userData.phone || '',
+                services: [],
+                description: '',
+                businessHours: {},
+                socialMedia: {}
+              });
+              console.log('Default vendor profile created');
+              break;
+
+            case 'admin':
+            default:
+              // For admin, we might not need to create a separate profile
+              // as admin might be a role-based permission rather than a profile type
+              console.log('No additional profile needed for admin role');
+              break;
+          }
+        }
+      } catch (profileError) {
+        console.warn(`Could not create default ${userData.role} profile:`, profileError.message);
+        // Don't fail the registration if profile creation fails
+      }
 
       if (!token || !user) {
         throw new Error('Invalid response format from register API');

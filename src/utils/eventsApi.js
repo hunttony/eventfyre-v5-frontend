@@ -6,9 +6,15 @@ const USE_MOCK = true;
 
 // Helper function to handle mock API responses
 const handleMockResponse = async (mockFn) => {
-  if (!USE_MOCK) return null;
+  if (!USE_MOCK || !mockFn) return null;
   
   try {
+    // Ensure mockFn is a function before calling it
+    if (typeof mockFn !== 'function') {
+      console.warn('mockFn is not a function:', mockFn);
+      return null;
+    }
+    
     const response = await mockFn();
     // If the response already has a data property, return it as is
     if (response && typeof response === 'object' && 'data' in response) {
@@ -17,8 +23,8 @@ const handleMockResponse = async (mockFn) => {
     // Otherwise wrap the response in a data property
     return { data: response };
   } catch (error) {
-    console.error('Mock API error:', error);
-    throw error;
+    console.warn('Mock API error, falling back to default data:', error);
+    return null; // Return null to trigger fallback behavior
   }
 };
 
@@ -31,18 +37,23 @@ export const eventsApi = {
       const userRole = user?.role || 'attendee';
       
       // Get appropriate mock function based on user role
-      let mockFn;
-      if (userRole === 'organizer') {
-        mockFn = mockApi.getOrganizerEvents;
-      } else if (userRole === 'vendor') {
-        mockFn = mockApi.getVendorEvents;
-      } else {
-        mockFn = mockApi.getUpcomingEvents;
+      let mockResponse;
+      try {
+        if (userRole === 'organizer') {
+          // Use getUpcomingEvents for organizer as fallback if getOrganizerEvents doesn't exist
+          mockResponse = await handleMockResponse(mockApi.getOrganizerEvents || mockApi.getUpcomingEvents);
+        } else if (userRole === 'vendor') {
+          // Use getUpcomingEvents for vendor as fallback if getVendorEvents doesn't exist
+          mockResponse = await handleMockResponse(mockApi.getVendorEvents || mockApi.getUpcomingEvents);
+        } else {
+          // Default to getUpcomingEvents for all other roles
+          mockResponse = await handleMockResponse(mockApi.getUpcomingEvents);
+        }
+        if (mockResponse) return mockResponse;
+      } catch (error) {
+        console.warn('Error in mock API call, falling back to default events:', error);
+        // Fall through to return default empty response
       }
-      
-      // Get mock response
-      const mockResponse = await handleMockResponse(mockFn);
-      if (mockResponse) return mockResponse;
       
       // Fallback to real API if mock is disabled
       return get('/events/upcoming');

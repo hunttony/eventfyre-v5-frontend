@@ -8,13 +8,15 @@ function Register() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'attendee' // Default role
+    role: 'vendor' // Default role
   });
   
+  // These are the valid role values expected by the backend
+  // Defined in src/types/user.d.ts
   const roleOptions = [
-    { value: 'attendee', label: 'Event Attendee' },
+    { value: 'vendor', label: 'Vendor/Service Provider' },
     { value: 'organizer', label: 'Event Organizer' },
-    { value: 'vendor', label: 'Vendor/Service Provider' }
+    { value: 'admin', label: 'Administrator' }
   ];
   
   const [loading, setLoading] = useState(false);
@@ -51,7 +53,7 @@ function Register() {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        role: formData.role
+        role: formData.role // Role is already set in the form state
       };
 
       console.log('Attempting registration with data:', registrationData);
