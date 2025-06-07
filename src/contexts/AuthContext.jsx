@@ -204,16 +204,26 @@ export function AuthProvider({ children }) {
    * @param {Partial<import('../types/user').User>} userData - Partial user data to update
    * @returns {void}
    */
-  // In your AuthContext.jsx
-const updateUser = useCallback((userData) => {
-  setCurrentUser(prev => {
-    // Only update if data has actually changed
-    if (JSON.stringify(prev) === JSON.stringify(userData)) {
-      return prev;
-    }
-    return { ...prev, ...userData };
-  });
-}, []);
+  /**
+   * Updates the current user's data and persists to localStorage
+   * @param {Partial<import('../types/user').User>} userData - User data to update
+   * @returns {void}
+   */
+  const updateUser = useCallback((userData) => {
+    setCurrentUser(prev => {
+      if (!prev) return userData; // If no previous user, use the new data
+      
+      // Only update if data has actually changed
+      const updatedUser = { ...prev, ...userData };
+      if (JSON.stringify(prev) === JSON.stringify(updatedUser)) {
+        return prev;
+      }
+      
+      // Update localStorage
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return updatedUser;
+    });
+  }, []);
 
   const value = {
     currentUser,

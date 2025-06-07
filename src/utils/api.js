@@ -356,38 +356,48 @@ export const authApi = {
     }
   },
 
-  getMe: async () => {
+  getMe: async (forceRefresh = true) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
-      const storedUser = localStorage.getItem('user');
+      // Only use cached data if not forcing a refresh
+      const storedUser = forceRefresh ? null : localStorage.getItem('user');
       if (storedUser) {
+        console.log('Returning user data from cache');
+        const userData = JSON.parse(storedUser);
         return {
-          data: JSON.parse(storedUser),
+          data: userData,
           success: true,
           message: 'User data retrieved from cache'
         };
       }
 
+      console.log('Fetching fresh user data from server...');
       const response = await get('/auth/me');
-      const user = response.data;
+      const user = response?.data;
 
       if (!user) {
+        console.error('Invalid user data received from server:', response);
         throw new Error('Invalid response format from getMe API');
       }
 
+      console.log('Fresh user data received:', user);
       localStorage.setItem('user', JSON.stringify(user));
 
       return {
         data: user,
         success: true,
-        message: 'User data retrieved'
+        message: 'User data retrieved from server'
       };
     } catch (error) {
-      console.error('Get current user error:', error.message, error.response?.data);
+      console.error('Get current user error:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data
+      });
       throw new Error(error.response?.data?.message || 'Failed to retrieve user data');
     }
   },
@@ -476,17 +486,25 @@ export const authApi = {
         throw new Error('User data is required');
       }
 
-      console.log('Updating profile with:', userData);
-      const isFormData = userData instanceof FormData;
-      const headers = isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' };
+      // Create a clean copy of user data, excluding the role field
+      const cleanUserData = { ...userData };
+      delete cleanUserData.role; // Remove role from the update data
 
-      const response = await put('/auth/me', userData, { headers });
-      const user = response.data;
+      console.log('Updating profile with cleaned data:', cleanUserData);
+      
+      // Always send as JSON, not FormData, for profile updates
+      const headers = { 'Content-Type': 'application/json' };
+
+      const response = await put('/auth/me', cleanUserData, { headers });
+      
+      // Handle different response formats
+      const user = response.data?.user || response.data;
 
       if (!user) {
         throw new Error('Invalid response format from updateProfile API');
       }
 
+      // Update localStorage with the full user object from the server
       localStorage.setItem('user', JSON.stringify(user));
 
       return {

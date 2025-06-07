@@ -21,40 +21,91 @@ const Profile = () => {
 
   // Fetch profile data on component mount and when currentUser changes
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchProfile = async () => {
+      console.log('Fetching profile data...');
       if (!currentUser) {
-        setIsLoading(false);
-        setError('Please log in to view your profile.');
+        console.log('No current user, cannot fetch profile');
+        if (isMounted) {
+          setIsLoading(false);
+          setError('Please log in to view your profile.');
+        }
         return;
       }
+      
+      // Clear any existing user data to force a fresh fetch
+      localStorage.removeItem('user');
   
       try {
-        setIsLoading(true);
-        const response = await authApi.getMe();
+        if (isMounted) {
+          console.log('Starting to fetch profile data...');
+          setIsLoading(true);
+        }
         
-        if (!response?.success || !response?.data) {
-          throw new Error(response?.message || 'Failed to fetch profile data');
+        console.log('Calling authApi.getMe() with force refresh...');
+        const response = await authApi.getMe(true); // Force refresh from server
+        console.log('Raw API Response:', JSON.stringify(response, null, 2));
+        
+        if (!isMounted) {
+          console.log('Component unmounted, aborting...');
+          return;
+        }
+        
+        if (!response) {
+          throw new Error('No response received from server');
+        }
+        
+        if (!response.success) {
+          console.error('API Error:', response.message || 'No error message provided');
+          throw new Error(response.message || 'Failed to fetch profile data');
+        }
+        
+        if (!response.data) {
+          console.error('No data in response:', response);
+          throw new Error('No data received from server');
         }
   
-        const userData = response.data;
-        setFormData({
-          name: userData.name || '',
-          email: userData.email || '',
-          phone: userData.phone || '',
-          bio: userData.bio || '',
-          company: userData.company || '',
-          location: userData.location || '',
-        });
+        // Extract user data from the response
+        // The user data is nested under response.data.userData
+        const userData = response.data?.userData || response.data?.data?.userData || response.data;
+        console.log('Extracted user data:', JSON.stringify(userData, null, 2));
+        
+        if (!userData) {
+          console.error('No user data found in response');
+          throw new Error('User data is missing from response');
+        }
+        
+        if (isMounted) {
+          // Use the nested fields from userData
+          const newFormData = {
+            name: userData.name || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+            bio: userData.bio || '',
+            company: userData.company || '',
+            location: userData.location || userData.city || '', // Fallback to city if location is not available
+          };
+          console.log('Setting form data:', newFormData);
+          setFormData(newFormData);
+        }
       } catch (err) {
         console.error('Profile fetch error:', err);
-        setError(err.message || 'Failed to load profile data');
+        if (isMounted) {
+          setError(err.message || 'Failed to load profile data');
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
   
     fetchProfile();
-  }, [currentUser?.id]); // Only re-run if currentUser.id changes
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]); // Re-run when currentUser changes
 
   const handleInputChange = (e) => {
     const { name, value, type, files } = e.target;
@@ -65,40 +116,158 @@ const Profile = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-  
+    console.log('Form submission started');
     try {
+      // Prevent default form submission
+      if (e && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
+      
+      console.log('Form data before submission:', JSON.stringify(formData, null, 2));
+      
+      // Prevent multiple submissions
+      if (isSubmitting) {
+        console.log('Submission already in progress');
+        return;
+      }
+      
+      // Reset error state
+      setError('');
+  
+      console.log('Starting profile update...');
       setIsSubmitting(true);
       setError('');
   
+      // Validate current user and token
       if (!currentUser) {
-        throw new Error('Please log in to update your profile.');
+        const errorMsg = 'Please log in to update your profile.';
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
       }
-  
-      const response = await authApi.updateProfile({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        bio: formData.bio,
-        company: formData.company,
-        location: formData.location,
-      });
-  
-      if (!response?.success) {
-        throw new Error(response?.message || 'Failed to update profile');
+
+      // Check if token is expired
+      const token = localStorage.getItem('token');
+      if (!token) {
+        const errorMsg = 'Your session has expired. Please log in again.';
+        console.error(errorMsg);
+        setError(errorMsg);
+        // Optionally redirect to login page
+        // navigate('/login', { state: { from: window.location.pathname } });
+        return;
       }
-  
-      // Update the auth context with the new data
-      updateUser(response.data);
-      
-      setError('Profile updated successfully!');
-      setTimeout(() => setError(''), 3000);
-      setIsEditing(false);
+
+      try {
+        // Create update data with only changed fields
+        const updateData = {};
+        const fields = ['name', 'email', 'phone', 'bio', 'company', 'location'];
+        
+        fields.forEach(field => {
+          if (formData[field] !== currentUser[field]) {
+            updateData[field] = formData[field] !== '' ? formData[field] : null;
+          }
+        });
+
+        // If no fields changed, show message and return
+        if (Object.keys(updateData).length === 0) {
+          console.log('No changes detected');
+          setError('No changes detected');
+          return;
+        }
+    
+        console.log('Updating profile with data:', updateData);
+        
+        // Make the API call
+        const response = await authApi.updateProfile(updateData);
+        console.log('Update profile response:', response);
+    
+        if (!response?.success) {
+          // If the error is about session expiration, handle it specifically
+          if (response?.message?.includes('expired') || response?.message?.includes('token')) {
+            const errorMsg = 'Your session has expired. Please log in again.';
+            console.error('Session expired:', errorMsg);
+            setError(errorMsg);
+            // Optionally redirect to login page
+            // navigate('/login', { state: { from: window.location.pathname } });
+            return;
+          }
+          
+          const errorMsg = response?.message || 'Failed to update profile';
+          console.error('API error:', errorMsg, response);
+          setError(errorMsg);
+          return;
+        }
+    
+        // Get the updated user data from the response
+        const responseData = response.data;
+        console.log('Update profile response data:', responseData);
+        
+        // The user data is nested under responseData.userData
+        const updatedUser = responseData.userData || responseData.data?.userData || responseData;
+        
+        if (!updatedUser) {
+          const errorMsg = 'No user data returned from server';
+          console.error(errorMsg);
+          setError(errorMsg);
+          return;
+        }
+        
+        console.log('Updating user context with:', updatedUser);
+        
+        // Update the user context with the complete user data
+        updateUser(updatedUser);
+        
+        // Create a complete form data object with all fields
+        const completeFormData = {
+          name: updatedUser.name || '',
+          email: updatedUser.email || '',
+          phone: updatedUser.phone || '',
+          bio: updatedUser.bio || '',
+          company: updatedUser.company || '',
+          location: updatedUser.location || ''
+        };
+        
+        console.log('Updating form data with:', completeFormData);
+        
+        // Update the form data
+        setFormData(completeFormData);
+        
+        // Also update localStorage to ensure consistency
+        try {
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const updatedUserData = { ...currentUser, ...updatedUser };
+          localStorage.setItem('user', JSON.stringify(updatedUserData));
+          console.log('Updated localStorage with user data');
+        } catch (e) {
+          console.error('Error updating localStorage:', e);
+        }
+        
+        console.log('Profile update successful');
+        setError('Profile updated successfully!');
+        setTimeout(() => setError(''), 3000);
+        setIsEditing(false);
+      } catch (apiError) {
+        console.error('API Error in handleSubmit:', apiError);
+        
+        // Handle specific error cases
+        if (apiError.message?.includes('expired') || apiError.message?.includes('token')) {
+          const errorMsg = 'Your session has expired. Please log in again.';
+          console.error('Session expired:', errorMsg);
+          setError(errorMsg);
+          // Optionally redirect to login page
+          // navigate('/login', { state: { from: window.location.pathname } });
+        } else {
+          setError(apiError.message || 'Failed to update profile. Please try again.');
+        }
+      }
     } catch (err) {
-      console.error('Update error:', err);
-      setError(err.message || 'Failed to update profile');
+      console.error('Error in handleSubmit:', err);
+      // Don't set error state if it's already set by the inner catch
+      if (!error) {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
+      console.log('Profile update process completed');
       setIsSubmitting(false);
     }
   };
@@ -194,7 +363,7 @@ const Profile = () => {
                   value={formData.email}
                   readOnly
                   disabled
-                  className="mt-1 block w-full border border-gray-300 bg-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm cursor-not-allowed"
+                  className="mt-1 block w-full border border-gray-300 text-gray-800 bg-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm cursor-not-allowed"
                 />
               </div>
 
@@ -206,7 +375,7 @@ const Profile = () => {
                   type="tel"
                   name="phone"
                   id="phone"
-                  value={formData.phone}
+                  value={formData.phone || currentUser.phone}
                   onChange={handleInputChange}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-900 focus:border-gray-900 sm:text-sm"
                   placeholder="+1 (555) 123-4567"
