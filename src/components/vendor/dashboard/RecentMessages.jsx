@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { format } from 'date-fns';
 import { messagesApi } from '../../../utils/api';
 
 const RecentMessages = () => {
@@ -12,17 +13,24 @@ const RecentMessages = () => {
       try {
         setLoading(true);
         const response = await messagesApi.getConversations();
-        const conversationsData = Array.isArray(response) ? response : (response?.data || []);
+        
+        // Handle both direct array response and response.data array
+        const conversationsData = Array.isArray(response) 
+          ? response 
+          : (Array.isArray(response?.data) ? response.data : []);
         
         // Sort by most recent message
         const sortedConversations = [...conversationsData].sort((a, b) => {
-          return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
+          const dateA = a.lastMessageAt ? new Date(a.lastMessageAt) : new Date(0);
+          const dateB = b.lastMessageAt ? new Date(b.lastMessageAt) : new Date(0);
+          return dateB - dateA;
         });
         
         setConversations(sortedConversations.slice(0, 3));
       } catch (err) {
         console.error('Error fetching recent messages:', err);
         setError('Failed to load recent messages');
+        setConversations([]); // Ensure we have an empty array on error
       } finally {
         setLoading(false);
       }

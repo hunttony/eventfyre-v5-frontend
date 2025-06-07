@@ -15,6 +15,7 @@ const VendorSelection = lazy(() => import('../components/organizer/VendorSelecti
 const VendorEvents = lazy(() => import('../components/VendorEvents'));
 const VendorDashboard = lazy(() => import('../components/Vendor/dashboard/VendorDashboard'));
 const MyAvailability = lazy(() => import('../components/Vendor/dashboard/MyAvailability'));
+const ManageAvailability = lazy(() => import('../components/Vendor/dashboard/ManageAvailability'));
 const MyServices = lazy(() => import('../components/Vendor/dashboard/MyServices'));
 const AttendeeDashboard = lazy(() => import('../components/attendee/dashboard/AttendeeDashboard'));
 const Profile = lazy(() => import('../components/common/Profile'));
@@ -117,7 +118,12 @@ export const protectedRoutes = [
   },
   {
     path: '/vendor/availability/add',
-    element: <div>Add Availability Form</div>,
+    element: <ManageAvailability />,
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/availability/edit/:id',
+    element: <ManageAvailability />,
     roles: ['vendor']
   },
   {

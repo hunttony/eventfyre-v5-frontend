@@ -11,26 +11,46 @@ const UpcomingBookings = () => {
     const fetchUpcomingBookings = async () => {
       try {
         setLoading(true);
-        const response = await vendorApi.getEvents();
-        const bookings = Array.isArray(response) ? response : (response?.data || []);
+        setError('');
+        
+        const { data: bookings = [], success, message } = await vendorApi.getEvents();
+        
+        if (!success) {
+          console.warn('Warning:', message);
+          // Continue with empty array instead of showing error for better UX
+        }
         
         // Filter for upcoming bookings (within next 30 days)
         const now = new Date();
         const thirtyDaysFromNow = new Date();
         thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
         
-        const upcoming = bookings
-          .filter(booking => {
-            const bookingDate = new Date(booking.startDate);
-            return bookingDate > now && bookingDate <= thirtyDaysFromNow;
-          })
-          .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
-          .slice(0, 5);
+        const upcoming = Array.isArray(bookings) 
+          ? bookings
+              .filter(booking => {
+                try {
+                  const bookingDate = booking?.startDate ? new Date(booking.startDate) : null;
+                  return bookingDate && bookingDate > now && bookingDate <= thirtyDaysFromNow;
+                } catch (e) {
+                  console.warn('Invalid booking date format:', booking?.startDate);
+                  return false;
+                }
+              })
+              .sort((a, b) => {
+                try {
+                  return new Date(a.startDate) - new Date(b.startDate);
+                } catch (e) {
+                  return 0;
+                }
+              })
+              .slice(0, 5)
+          : [];
         
         setUpcomingBookings(upcoming);
       } catch (err) {
         console.error('Error fetching upcoming bookings:', err);
         setError('Failed to load upcoming bookings');
+        setUpcomingBookings([]); // Ensure we have an empty array on error
       } finally {
         setLoading(false);
       }

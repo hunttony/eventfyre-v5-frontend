@@ -36,9 +36,17 @@ const AvailabilityCalendar = () => {
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
 
   const isAvailable = (day) => {
+    if (!Array.isArray(availability)) {
+      return false;
+    }
     return availability.some(avail => {
-      const availDate = new Date(avail.date);
-      return isSameDay(availDate, day) && avail.isAvailable;
+      try {
+        const availDate = new Date(avail.date);
+        return isSameDay(availDate, day) && (avail.isAvailable === true);
+      } catch (e) {
+        console.error('Error checking availability:', e);
+        return false;
+      }
     });
   };
 

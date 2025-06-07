@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authApi } from '../../utils/api';
 import { XCircleIcon } from '@heroicons/react/24/outline';

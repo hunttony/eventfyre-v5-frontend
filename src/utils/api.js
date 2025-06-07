@@ -546,25 +546,48 @@ export const authApi = {
 
 // Vendor API calls
 export const vendorApi = {
-  getAvailability: async () => {
+  getAvailability: async (params = {}) => {
     try {
-      const response = await get('/vendors/availability');
+      const response = await get('/vendors/me/availability', { params });
+      // Ensure we always return an array, even if response structure is different
+      const availabilityData = Array.isArray(response?.data) 
+        ? response.data 
+        : (Array.isArray(response) ? response : []);
+      
+      return {
+        data: availabilityData,
+        success: true,
+        message: 'Availability retrieved successfully'
+      };
+    } catch (error) {
+      console.error('Get availability error:', error.message, error.response?.data);
+      // Return empty array instead of throwing to prevent UI breakage
+      return {
+        data: [],
+        success: false,
+        message: error.response?.data?.message || 'Failed to retrieve availability'
+      };
+    }
+  },
+
+  getAvailabilityById: async (id) => {
+    try {
+      if (!id) throw new Error('Availability ID is required');
+      const response = await get(`/vendors/availability/${id}`);
       return {
         data: response.data,
         success: true,
         message: 'Availability retrieved successfully'
       };
     } catch (error) {
-      console.error('Get availability error:', error.message, error.response?.data);
+      console.error('Get availability by ID error:', error.message, error.response?.data);
       throw new Error(error.response?.data?.message || 'Failed to retrieve availability');
     }
   },
 
   addAvailability: async (data) => {
     try {
-      if (!data) {
-        throw new Error('Availability data is required');
-      }
+      if (!data) throw new Error('Availability data is required');
       const response = await post('/vendors/availability', data);
       return {
         data: response.data,
@@ -574,6 +597,84 @@ export const vendorApi = {
     } catch (error) {
       console.error('Add availability error:', error.message, error.response?.data);
       throw new Error(error.response?.data?.message || 'Failed to add availability');
+    }
+  },
+
+  updateAvailability: async (id, data) => {
+    try {
+      if (!id) throw new Error('Availability ID is required');
+      if (!data) throw new Error('Update data is required');
+      const response = await put(`/vendors/availability/${id}`, data);
+      return {
+        data: response.data,
+        success: true,
+        message: 'Availability updated successfully'
+      };
+    } catch (error) {
+      console.error('Update availability error:', error.message, error.response?.data);
+      throw new Error(error.response?.data?.message || 'Failed to update availability');
+    }
+  },
+
+  deleteAvailability: async (id) => {
+    try {
+      if (!id) throw new Error('Availability ID is required');
+      const response = await del(`/vendors/availability/${id}`);
+      return {
+        data: response.data,
+        success: true,
+        message: 'Availability deleted successfully'
+      };
+    } catch (error) {
+      console.error('Delete availability error:', error.message, error.response?.data);
+      throw new Error(error.response?.data?.message || 'Failed to delete availability');
+    }
+  },
+
+  bulkUpdateAvailability: async (updates) => {
+    try {
+      if (!Array.isArray(updates)) throw new Error('Array of updates is required');
+      const response = await put('/vendors/availability/bulk', { updates });
+      return {
+        data: response.data,
+        success: true,
+        message: 'Availability updated successfully'
+      };
+    } catch (error) {
+      console.error('Bulk update availability error:', error.message, error.response?.data);
+      throw new Error(error.response?.data?.message || 'Failed to update availability');
+    }
+  },
+
+  getAvailableSlots: async (startDate, endDate) => {
+    try {
+      const response = await get('/vendors/availability/slots', {
+        params: { startDate, endDate }
+      });
+      return {
+        data: response.data,
+        success: true,
+        message: 'Available slots retrieved successfully'
+      };
+    } catch (error) {
+      console.error('Get available slots error:', error.message, error.response?.data);
+      throw new Error(error.response?.data?.message || 'Failed to retrieve available slots');
+    }
+  },
+
+  checkAvailability: async (startTime, endTime) => {
+    try {
+      const response = await get('/vendors/availability/check', {
+        params: { startTime, endTime }
+      });
+      return {
+        data: response.data,
+        success: true,
+        message: 'Availability check successful'
+      };
+    } catch (error) {
+      console.error('Check availability error:', error.message, error.response?.data);
+      throw new Error(error.response?.data?.message || 'Failed to check availability');
     }
   },
 
@@ -624,7 +725,7 @@ export const vendorApi = {
 
   getServices: async () => {
     try {
-      const response = await get('/services/my-services');
+      const response = await get('/vendors/services');
       return {
         data: response.data,
         success: true,
@@ -636,6 +737,23 @@ export const vendorApi = {
     }
   },
 
+  deleteService: async (serviceId) => {
+    try {
+      if (!serviceId) {
+        throw new Error('Service ID is required');
+      }
+      const response = await del(`/vendors/services/${serviceId}`);
+      return {
+        data: response.data,
+        success: true,
+        message: 'Service deleted successfully'
+      };
+    } catch (error) {
+      console.error('Delete service error:', error.message, error.response?.data);
+      throw new Error(error.response?.data?.message || 'Failed to delete service');
+    }
+  },
+  
   getService: async (serviceId) => {
     try {
       if (!serviceId) {
@@ -835,15 +953,23 @@ export const vendorApi = {
 
   getEvents: async () => {
     try {
-      const response = await get('/vendors/events');
+      const response = await get('/vendors/me/events');
+      // Ensure we always return an array, even if response structure is different
+      const eventsData = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+      
       return {
-        data: response.data,
+        data: eventsData,
         success: true,
         message: 'Events retrieved successfully'
       };
     } catch (error) {
       console.error('Get events error:', error.message, error.response?.data);
-      throw new Error(error.response?.data?.message || 'Failed to retrieve events');
+      // Return empty array instead of throwing to prevent UI breakage
+      return {
+        data: [],
+        success: false,
+        message: error.response?.data?.message || 'Failed to retrieve events'
+      };
     }
   },
 
@@ -989,15 +1115,22 @@ export const vendorApi = {
 export const organizerApi = {
   getEvents: async () => {
     try {
-      const response = await get('/organizer/events');
+      const response = await get('/vendors/me/events');
+      // Ensure we always return an array for data
+      const events = Array.isArray(response?.data) ? response.data : [];
       return {
-        data: response.data,
+        data: events,
         success: true,
         message: 'Events retrieved successfully'
       };
     } catch (error) {
       console.error('Get events error:', error.message, error.response?.data);
-      throw new Error(error.response?.data?.message || 'Failed to retrieve events');
+      // Return empty array on error to prevent crashes
+      return {
+        data: [],
+        success: false,
+        message: error.response?.data?.message || 'Failed to retrieve events'
+      };
     }
   },
 
@@ -1455,7 +1588,7 @@ export const organizerApi = {
 export const messagesApi = {
   getConversations: async () => {
     try {
-      const response = await get('/messages/conversations');
+      const response = await get('/api/v1/messaging/conversations');
       return {
         data: response.data,
         success: true,
@@ -1463,6 +1596,10 @@ export const messagesApi = {
       };
     } catch (error) {
       console.error('Get conversations error:', error.message, error.response?.data);
+      // Return empty array instead of throwing error to prevent UI from breaking
+      if (error.response?.status === 404 || error.response?.status === 500) {
+        return { data: [], success: true, message: 'No conversations found' };
+      }
       throw new Error(error.response?.data?.message || 'Failed to retrieve conversations');
     }
   },

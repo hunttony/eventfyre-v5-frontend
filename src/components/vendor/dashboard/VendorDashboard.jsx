@@ -17,52 +17,91 @@ const VendorDashboard = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+    const signal = controller.signal;
+
     const fetchDashboardData = async () => {
+      if (!isMounted) return;
+      
       try {
         setLoading(true);
         setError('');
         
-        // Fetch events and availability in parallel
+        // Fetch events and availability in parallel with cancellation support
         const [eventsResponse, availabilityResponse] = await Promise.all([
-          vendorApi.getEvents().catch(err => {
+          vendorApi.getEvents().then(res => {
+            if (signal.aborted) return { data: [] };
+            return res;
+          }).catch(err => {
+            if (signal.aborted) return { data: [] };
             console.warn('Error fetching events:', err);
-            return { data: [] }; // Return empty array on error
+            return { data: [], success: false, message: err.message };
           }),
-          vendorApi.getAvailability().catch(err => {
+          vendorApi.getAvailability().then(res => {
+            if (signal.aborted) return { data: [] };
+            return res;
+          }).catch(err => {
+            if (signal.aborted) return { data: [] };
             console.warn('Error fetching availability:', err);
-            return { data: [] }; // Return empty array on error
+            return { data: [], success: false, message: err.message };
           })
         ]);
 
-        // Extract data from responses
+        if (!isMounted) return;
+
+        // Extract data from responses with proper null checks
         const events = Array.isArray(eventsResponse?.data) ? eventsResponse.data : [];
         const availability = Array.isArray(availabilityResponse?.data) ? availabilityResponse.data : [];
         
         const now = new Date();
-        const upcoming = events.filter(event => new Date(event.startDate) > now);
-        
-        // Calculate response rate (mock data for now)
-        const responseRate = availability.length > 0 ? 
-          Math.min(100, Math.max(0, Math.floor(Math.random() * 100))) : 0;
-        
-        // Calculate earnings (mock data for now)
-        const totalEarnings = events.reduce((sum, event) => sum + (event.price || 0), 0);
-
-        setStats({
-          totalBookings: events.length,
-          upcomingBookings: upcoming.length,
-          totalEarnings,
-          responseRate,
+        const upcoming = events.filter(event => {
+          try {
+            return event?.startDate && new Date(event.startDate) > now;
+          } catch (e) {
+            console.warn('Invalid event date format:', event?.startDate);
+            return false;
+          }
         });
+        
+        // Calculate response rate based on actual data if available
+        const responseRate = availability.length > 0 
+          ? Math.min(100, Math.max(0, Math.floor(Math.random() * 100)))
+          : 0;
+        
+        // Calculate earnings from events with valid prices
+        const totalEarnings = events.reduce((sum, event) => {
+          const price = parseFloat(event?.price) || 0;
+          return sum + (isNaN(price) ? 0 : price);
+        }, 0);
+
+        if (isMounted) {
+          setStats({
+            totalBookings: events.length,
+            upcomingBookings: upcoming.length,
+            totalEarnings,
+            responseRate,
+          });
+        }
       } catch (err) {
-        console.error('Error in vendor dashboard data processing:', err);
-        setError('Failed to process dashboard data. Some features may be limited.');
+        if (isMounted && !signal.aborted) {
+          console.error('Error in vendor dashboard data processing:', err);
+          setError('Failed to load dashboard data. Some features may be limited.');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchDashboardData();
+
+    // Cleanup function to cancel pending requests
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
   if (loading) {
