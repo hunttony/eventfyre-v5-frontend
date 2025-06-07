@@ -14,6 +14,8 @@ const EventDetail = lazy(() => import('../components/organizer/EventDetail'));
 const VendorSelection = lazy(() => import('../components/organizer/VendorSelection'));
 const VendorEvents = lazy(() => import('../components/VendorEvents'));
 const VendorDashboard = lazy(() => import('../components/Vendor/dashboard/VendorDashboard'));
+const MyAvailability = lazy(() => import('../components/Vendor/dashboard/MyAvailability'));
+const MyServices = lazy(() => import('../components/Vendor/dashboard/MyServices'));
 const AttendeeDashboard = lazy(() => import('../components/attendee/dashboard/AttendeeDashboard'));
 const Profile = lazy(() => import('../components/common/Profile'));
 const Messaging = lazy(() => import('../components/Messaging'));
@@ -110,12 +112,27 @@ export const protectedRoutes = [
   },
   {
     path: '/vendor/availability',
-    element: <div>Vendor Availability</div>,
+    element: <MyAvailability />,
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/availability/add',
+    element: <div>Add Availability Form</div>,
     roles: ['vendor']
   },
   {
     path: '/vendor/services',
-    element: <div>Vendor Services</div>,
+    element: <MyServices />,
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/services/add',
+    element: <div>Add Service Form</div>,
+    roles: ['vendor']
+  },
+  {
+    path: '/vendor/services/edit/:id',
+    element: <div>Edit Service Form</div>,
     roles: ['vendor']
   },
   
