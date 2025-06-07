@@ -1588,7 +1588,7 @@ export const organizerApi = {
 export const messagesApi = {
   getConversations: async () => {
     try {
-      const response = await get('/api/v1/messaging/conversations');
+      const response = await get('/messaging/conversations');
       return {
         data: response.data,
         success: true,
@@ -1609,7 +1609,7 @@ export const messagesApi = {
       if (!userId) {
         throw new Error('User ID is required');
       }
-      const response = await get(`/messages?userId=${userId}${eventId ? `&eventId=${eventId}` : ''}`);
+      const response = await get(`/messaging/messages?userId=${userId}${eventId ? `&eventId=${eventId}` : ''}`);
       return {
         data: response.data,
         success: true,
@@ -1626,7 +1626,7 @@ export const messagesApi = {
       if (!data?.recipientId || !data?.content) {
         throw new Error('Recipient ID and message content are required');
       }
-      const response = await post('/messages', data);
+      const response = await post('/messaging/messages', data);
       return {
         data: response.data,
         success: true,

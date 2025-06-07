@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { messagesApi } from '../utils/api';
 
 function Messaging() {
   const [conversations, setConversations] = useState([]);
@@ -18,13 +18,8 @@ function Messaging() {
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/api/v2/messages/conversations', {
-          headers: { 
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}` 
-          }
-        });
-        setConversations(response.data.data || []);
+        const response = await messagesApi.getConversations();
+        setConversations(response.data || []);
       } catch (err) {
         console.error('Error fetching conversations:', err);
         setError('Failed to load conversations');
@@ -39,26 +34,23 @@ function Messaging() {
   // Fetch messages when a conversation is selected
   useEffect(() => {
     if (selectedConversation) {
-      const fetchMessages = async () => {
+      const fetchMessages = useCallback(async () => {
+        if (!selectedConversation) return;
+        
         setLoading(prev => ({ ...prev, messages: true }));
         try {
-          const response = await axios.get(
-            `http://localhost:3000/api/v2/messages?userId=${selectedConversation.userId}${selectedConversation.eventId ? `&eventId=${selectedConversation.eventId}` : ''}`,
-            {
-              headers: { 
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${localStorage.getItem('token')}` 
-              }
-            }
+          const response = await messagesApi.getMessages(
+            selectedConversation.userId,
+            selectedConversation.eventId || null
           );
-          setMessages(response.data.data || []);
+          setMessages(response.data || []);
         } catch (err) {
           console.error('Error fetching messages:', err);
           setError('Failed to load messages');
         } finally {
           setLoading(prev => ({ ...prev, messages: false }));
         }
-      };
+      }, [selectedConversation]);
 
       fetchMessages();
     }
@@ -76,33 +68,18 @@ function Messaging() {
     setLoading(prev => ({ ...prev, sending: true }));
     
     try {
-      await axios.post(
-        'http://localhost:3000/api/v2/messages',
-        {
-          recipientId: selectedConversation.userId,
-          eventId: selectedConversation.eventId || undefined,
-          content: newMessage.trim()
-        },
-        {
-          headers: { 
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}` 
-          }
-        }
-      );
+      await messagesApi.sendMessage({
+        recipientId: selectedConversation.userId,
+        eventId: selectedConversation.eventId || undefined,
+        content: newMessage.trim()
+      });
 
       // Refresh messages
-      const response = await axios.get(
-        `http://localhost:3000/api/v2/messages?userId=${selectedConversation.userId}${selectedConversation.eventId ? `&eventId=${selectedConversation.eventId}` : ''}`,
-        {
-          headers: { 
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}` 
-          }
-        }
+      const response = await messagesApi.getMessages(
+        selectedConversation.userId,
+        selectedConversation.eventId || null
       );
-      setMessages(response.data.data || []);
-      
+      setMessages(response.data || []);
       setNewMessage('');
       setError('');
     } catch (err) {
