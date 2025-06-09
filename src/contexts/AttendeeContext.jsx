@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { eventsApi } from '../utils/api';
+import { eventsApi } from '../utils/eventsApi';
 import { useAuth } from './AuthContext';
 
 const AttendeeContext = createContext();

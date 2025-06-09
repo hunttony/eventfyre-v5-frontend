@@ -1,5 +1,24 @@
-import { get, post, put, del } from './api';
+import axios from 'axios';
 import { mockApi } from './mockApi';
+
+// Import the configured axios instance from api.js
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+});
+
+// Add request interceptor to include auth token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 // Check if we should use mock API
 const USE_MOCK = true;
@@ -56,7 +75,7 @@ export const eventsApi = {
       }
       
       // Fallback to real API if mock is disabled
-      return get('/events/upcoming');
+      return api.get('/events/upcoming');
     } catch (error) {
       console.error('Error in getUpcomingEvents:', error);
       return { data: { events: [], total: 0, page: 1, limit: 10 } };
@@ -68,7 +87,7 @@ export const eventsApi = {
     try {
       const mockResponse = await handleMockResponse(mockApi.getPastEvents);
       if (mockResponse) return mockResponse;
-      return get('/events/past');
+      return api.get('/events/past');
     } catch (error) {
       console.error('Error in getPastEvents:', error);
       return { data: { events: [], total: 0, page: 1, limit: 10 } };
@@ -80,7 +99,7 @@ export const eventsApi = {
     try {
       const mockResponse = await handleMockResponse(mockApi.getSavedEvents);
       if (mockResponse) return mockResponse;
-      return get('/events/saved');
+      return api.get('/events/saved');
     } catch (error) {
       console.error('Error in getSavedEvents:', error);
       return { data: { events: [], total: 0, page: 1, limit: 10 } };
@@ -90,7 +109,7 @@ export const eventsApi = {
   // Search events
   searchEvents: async (query) => {
     if (USE_MOCK) {
-      const response = await mockApi.getUpcomingEvents();
+      const response = await api.get('/events/upcoming');
       const events = response.data?.events || [];
       const filteredEvents = events.filter(event => 
         event.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -98,7 +117,7 @@ export const eventsApi = {
       );
       return { events: filteredEvents, total: filteredEvents.length };
     }
-    return get('/events/search', { params: { query } });
+    return api.get('/events/search', { params: { query } });
   },
 
   // Get event details
@@ -113,7 +132,7 @@ export const eventsApi = {
     );
     
     if (mockResponse !== null) return mockResponse;
-    return get(`/events/${eventId}`);
+    return api.get(`/events/${eventId}`);
   },
 
   // Save/unsave event
@@ -122,7 +141,7 @@ export const eventsApi = {
       console.log(`[Mock API] Saving event ${eventId}`);
       return { success: true };
     }
-    return post(`/events/${eventId}/save`);
+    return api.post(`/events/${eventId}/save`);
   },
 
   unsaveEvent: async (eventId) => {
@@ -130,7 +149,7 @@ export const eventsApi = {
       console.log(`[Mock API] Unsaving event ${eventId}`);
       return { success: true };
     }
-    return del(`/events/${eventId}/save`);
+    return api.delete(`/events/${eventId}/save`);
   },
 
   // Event registration
@@ -148,7 +167,7 @@ export const eventsApi = {
         } 
       };
     }
-    return post(`/events/${eventId}/register`, data);
+    return api.post(`/events/${eventId}/register`, data);
   },
 
   cancelRegistration: async (eventId) => {
@@ -156,7 +175,7 @@ export const eventsApi = {
       console.log(`[Mock API] Canceling registration for event ${eventId}`);
       return { success: true };
     }
-    return del(`/events/${eventId}/register`);
+    return api.delete(`/events/${eventId}/register`);
   },
 
   // Event attendees
@@ -167,7 +186,7 @@ export const eventsApi = {
       const attendees = response.data?.attendees || [];
       return { attendees, total: attendees.length };
     }
-    return get(`/events/${eventId}/attendees`, { params: filters });
+    return api.get(`/events/${eventId}/attendees`, { params: filters });
   },
 
   // Event vendors
@@ -176,7 +195,7 @@ export const eventsApi = {
       console.log(`[Mock API] Getting vendors for event ${eventId}`);
       return { vendors: [], total: 0 };
     }
-    return get(`/events/${eventId}/vendors`);
+    return api.get(`/events/${eventId}/vendors`);
   },
 
   // Event schedule
@@ -185,7 +204,7 @@ export const eventsApi = {
       console.log(`[Mock API] Getting schedule for event ${eventId}`);
       return { sessions: [] };
     }
-    return get(`/events/${eventId}/schedule`);
+    return api.get(`/events/${eventId}/schedule`);
   },
 
   // Session check-in
@@ -194,7 +213,7 @@ export const eventsApi = {
       console.log(`[Mock API] Checking in attendee ${attendeeId} to session ${sessionId}`);
       return { success: true };
     }
-    return post(`/events/${eventId}/sessions/${sessionId}/check-in`, { attendeeId });
+    return api.post(`/events/${eventId}/sessions/${sessionId}/check-in`, { attendeeId });
   },
 
   // Feedback
@@ -203,7 +222,7 @@ export const eventsApi = {
       console.log(`[Mock API] Submitting feedback for event ${eventId}`, feedbackData);
       return { success: true };
     }
-    return post(`/events/${eventId}/feedback`, {
+    return api.post(`/events/${eventId}/feedback`, {
       attendeeId: feedbackData.attendeeId,
       ratings: feedbackData.ratings,
       comments: feedbackData.comments || null,
@@ -216,7 +235,7 @@ export const eventsApi = {
       console.log(`[Mock API] Tracking interaction for event ${eventId}`, interactionData);
       return { success: true };
     }
-    return post(`/events/${eventId}/interactions`, {
+    return api.post(`/events/${eventId}/interactions`, {
       attendeeId: interactionData.attendeeId,
       type: interactionData.type,
       details: interactionData.details || {},
@@ -229,7 +248,7 @@ export const eventsApi = {
       console.log(`[Mock API] Updating registration for event ${eventId}`, data);
       return { success: true };
     }
-    return put(`/events/${eventId}/register`, data);
+    return api.put(`/events/${eventId}/register`, data);
   },
 
   // Get attendee profile
@@ -244,7 +263,7 @@ export const eventsApi = {
         registrationDate: new Date().toISOString()
       };
     }
-    return get(`/events/${eventId}/attendees/${attendeeId}`);
+    return api.get(`/events/${eventId}/attendees/${attendeeId}`);
   },
 
   // Get attendee sessions
@@ -253,7 +272,7 @@ export const eventsApi = {
       console.log(`[Mock API] Getting sessions for attendee ${attendeeId}`);
       return { sessions: [] };
     }
-    return get(`/events/${eventId}/attendees/${attendeeId}/sessions`);
+    return api.get(`/events/${eventId}/attendees/${attendeeId}/sessions`);
   },
 
   // Update attendee status
@@ -262,7 +281,7 @@ export const eventsApi = {
       console.log(`[Mock API] Updating status for attendee ${attendeeId} to ${status}`);
       return { success: true };
     }
-    return put(`/events/${eventId}/attendees/${attendeeId}/status`, { status });
+    return api.put(`/events/${eventId}/attendees/${attendeeId}/status`, { status });
   }
 };
 

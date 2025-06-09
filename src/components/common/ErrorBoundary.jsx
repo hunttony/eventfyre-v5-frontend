@@ -21,19 +21,27 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-4 bg-red-50 rounded-lg">
-          <h2 className="text-lg font-medium text-red-800">Something went wrong</h2>
-          <p className="mt-2 text-red-700">
-            {this.state.error?.message || 'An unexpected error occurred'}
-          </p>
-          {this.props.onRetry && (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-lg text-center">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h2>
+            <p className="text-gray-600 mb-6">
+              We're sorry, but an unexpected error occurred. Please try refreshing the page.
+            </p>
             <button
-              onClick={this.handleRetry}
-              className="mt-4 px-4 py-2 bg-red-100 text-red-800 rounded hover:bg-red-200"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              Try Again
+              Refresh Page
             </button>
-          )}
+            {this.state.error && (
+              <details className="mt-4 text-left">
+                <summary className="text-sm text-gray-500 cursor-pointer">Error details</summary>
+                <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
+                  {this.state.error.toString()}
+                </pre>
+              </details>
+            )}
+          </div>
         </div>
       );
     }

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../../utils/api';
+import { US_STATES, getCitiesForState, getZipCodesForCity } from '../../utils/locations';
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -8,21 +9,67 @@ function Register() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'vendor' // Default role
+    role: 'attendee', // Default role
+    state: '',
+    city: '',
+    zipCode: ''
   });
+  
+  const [cities, setCities] = useState([]);
+  const [zipCodes, setZipCodes] = useState([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [loadingZipCodes, setLoadingZipCodes] = useState(false);
   
   // These are the valid role values expected by the backend
   // Defined in src/types/user.d.ts
   const roleOptions = [
     { value: 'vendor', label: 'Vendor/Service Provider' },
     { value: 'organizer', label: 'Event Organizer' },
-    { value: 'admin', label: 'Administrator' }
+    { value: 'attendee', label: 'Attendee' }
   ];
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchCities = async () => {
+      if (formData.state) {
+        setLoadingCities(true);
+        const citiesList = await getCitiesForState(formData.state);
+        setCities(citiesList);
+        setLoadingCities(false);
+        // Reset city and zip code when state changes
+        setFormData(prev => ({
+          ...prev,
+          city: '',
+          zipCode: ''
+        }));
+        setZipCodes([]);
+      }
+    };
+    
+    fetchCities();
+  }, [formData.state]);
+  
+  useEffect(() => {
+    const fetchZipCodes = async () => {
+      if (formData.state && formData.city) {
+        setLoadingZipCodes(true);
+        const zipCodesList = await getZipCodesForCity(formData.state, formData.city);
+        setZipCodes(zipCodesList);
+        setLoadingZipCodes(false);
+        // Reset zip code when city changes
+        setFormData(prev => ({
+          ...prev,
+          zipCode: ''
+        }));
+      }
+    };
+    
+    fetchZipCodes();
+  }, [formData.state, formData.city]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -53,7 +100,10 @@ function Register() {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
-        role: formData.role // Role is already set in the form state
+        role: formData.role, // Role is already set in the form state
+        state: formData.state,
+        city: formData.city,
+        zipCode: formData.zipCode
       };
 
       console.log('Attempting registration with data:', registrationData);
@@ -189,6 +239,87 @@ function Register() {
                     onChange={handleChange}
                     className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
+                </div>
+              </div>
+
+              <div className="sm:col-span-6">
+                <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                  State *
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="state"
+                    name="state"
+                    required
+                    value={formData.state}
+                    onChange={handleChange}
+                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  >
+                    <option value="">Select a state</option>
+                    {US_STATES.map((state) => (
+                      <option key={state.abbreviation} value={state.abbreviation}>
+                        {state.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="sm:col-span-6">
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                  City *
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="city"
+                    name="city"
+                    required
+                    value={formData.city}
+                    onChange={handleChange}
+                    disabled={!formData.state || loadingCities}
+                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                  >
+                    <option value="">Select a city</option>
+                    {cities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingCities && (
+                    <p className="mt-1 text-xs text-gray-500">Loading cities...</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="sm:col-span-6">
+                <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700">
+                  ZIP Code *
+                </label>
+                <div className="mt-1">
+                  <select
+                    id="zipCode"
+                    name="zipCode"
+                    required
+                    value={formData.zipCode}
+                    onChange={handleChange}
+                    disabled={!formData.city || loadingZipCodes}
+                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                  >
+                    <option value="">Select a ZIP code</option>
+                    {zipCodes.map((zip) => (
+                      <option key={zip} value={zip}>
+                        {zip}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingZipCodes ? (
+                    <p className="mt-1 text-xs text-gray-500">Loading ZIP codes...</p>
+                  ) : !formData.city ? (
+                    <p className="mt-1 text-xs text-gray-500">Please select a city first</p>
+                  ) : zipCodes.length === 0 ? (
+                    <p className="mt-1 text-xs text-gray-500">No ZIP codes found for this city</p>
+                  ) : null}
                 </div>
               </div>
 

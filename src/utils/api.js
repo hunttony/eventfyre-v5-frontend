@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { eventsApi } from './eventsApi';
 
 // Base URL configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
@@ -226,10 +227,50 @@ api.interceptors.response.use(
 );
 
 // Helper functions for CRUD operations
-export const get = (url, config = {}) => api.get(url, config);
-export const post = (url, data, config = {}) => api.post(url, data, config);
-export const put = (url, data, config = {}) => api.put(url, data, config);
-export const del = (url, config = {}) => api.delete(url, config);
+export const get = async (url, config = {}) => {
+  // Ensure token is in the headers if available
+  const token = localStorage.getItem('token');
+  if (token && !config.headers?.Authorization) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`
+    };
+  }
+  return api.get(url, config);
+};
+
+export const post = (url, data, config = {}) => {
+  const token = localStorage.getItem('token');
+  if (token && !config.headers?.Authorization) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`
+    };
+  }
+  return api.post(url, data, config);
+};
+
+export const put = (url, data, config = {}) => {
+  const token = localStorage.getItem('token');
+  if (token && !config.headers?.Authorization) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`
+    };
+  }
+  return api.put(url, data, config);
+};
+
+export const del = (url, config = {}) => {
+  const token = localStorage.getItem('token');
+  if (token && !config.headers?.Authorization) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`
+    };
+  }
+  return api.delete(url, config);
+};
 
 // Auth API calls
 export const authApi = {
@@ -308,15 +349,25 @@ export const authApi = {
               break;
 
             case 'vendor':
-              await post('/vendor/profile', {
-                name: userData.name,
-                email: userData.email,
-                phone: userData.phone || '',
-                services: [],
+              // Create vendor profile with location data
+              const vendorProfile = {
+                businessName: userData.name,
+                contactDetails: {
+                  email: userData.email,
+                  phone: userData.phone || ''
+                },
+                location: {
+                  city: userData.city || '',
+                  state: userData.state || '',
+                  zipCode: userData.zipCode || '',
+                  serviceArea: userData.zipCode ? [userData.zipCode] : []
+                },
                 description: '',
-                businessHours: {},
-                socialMedia: {}
-              });
+                website: ''
+              };
+              
+              console.log('Creating vendor profile with data:', vendorProfile);
+              await post('/vendors/profile', vendorProfile);
               console.log('Default vendor profile created');
               break;
 
@@ -358,21 +409,31 @@ export const authApi = {
 
   getMe: async (forceRefresh = true) => {
     try {
+      // Check for token in localStorage
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('No authentication token found');
+        console.warn('No authentication token found in localStorage');
+        // Don't throw here, let the server handle the unauthorized case
+      } else {
+        // Ensure the token is set in the axios defaults
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       }
 
-      // Only use cached data if not forcing a refresh
-      const storedUser = forceRefresh ? null : localStorage.getItem('user');
-      if (storedUser) {
-        console.log('Returning user data from cache');
-        const userData = JSON.parse(storedUser);
-        return {
-          data: userData,
-          success: true,
-          message: 'User data retrieved from cache'
-        };
+      // Only use cached data if not forcing a refresh and we have a valid user
+      const storedUser = localStorage.getItem('user');
+      if (storedUser && !forceRefresh) {
+        try {
+          const userData = JSON.parse(storedUser);
+          console.log('Returning user data from cache');
+          return {
+            data: userData,
+            success: true,
+            message: 'User data retrieved from cache'
+          };
+        } catch (e) {
+          console.warn('Failed to parse cached user data', e);
+          // Continue to fetch fresh data if parsing fails
+        }
       }
 
       console.log('Fetching fresh user data from server...');
@@ -385,6 +446,7 @@ export const authApi = {
       }
 
       console.log('Fresh user data received:', user);
+      // Update the stored user data
       localStorage.setItem('user', JSON.stringify(user));
 
       return {
@@ -1588,7 +1650,7 @@ export const organizerApi = {
 export const messagesApi = {
   getConversations: async () => {
     try {
-      const response = await get('/messaging/conversations');
+      const response = await get('/vendors/me/conversations');
       return {
         data: response.data,
         success: true,
@@ -1609,7 +1671,7 @@ export const messagesApi = {
       if (!userId) {
         throw new Error('User ID is required');
       }
-      const response = await get(`/messaging/messages?userId=${userId}${eventId ? `&eventId=${eventId}` : ''}`);
+      const response = await get(`/vendors/me/messages?userId=${userId}${eventId ? `&eventId=${eventId}` : ''}`);
       return {
         data: response.data,
         success: true,
@@ -1626,7 +1688,7 @@ export const messagesApi = {
       if (!data?.recipientId || !data?.content) {
         throw new Error('Recipient ID and message content are required');
       }
-      const response = await post('/messaging/messages', data);
+      const response = await post('/vendors/me/messages', data);
       return {
         data: response.data,
         success: true,
@@ -1639,7 +1701,5 @@ export const messagesApi = {
   },
 };
 
-// Import events API
-import { eventsApi } from './eventsApi';
-
+// Export the API instance and events API
 export { api, eventsApi };
