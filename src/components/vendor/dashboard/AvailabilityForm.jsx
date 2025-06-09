@@ -35,24 +35,35 @@ const AvailabilityForm = ({ onSuccess, initialData, onCancel }) => {
   const validateForm = () => {
     const newErrors = {};
     
+    // Validate start date
     if (!formData.startDate) {
       newErrors.startDate = 'Start date is required';
+    } else if (isBefore(new Date(formData.startDate), new Date()) && !isToday(new Date(formData.startDate))) {
+      newErrors.startDate = 'Start date cannot be in the past';
     }
     
+    // Validate times
     if (!formData.startTime) {
       newErrors.startTime = 'Start time is required';
     }
     
     if (!formData.endTime) {
       newErrors.endTime = 'End time is required';
-    } else if (formData.endTime <= formData.startTime) {
+    } else if (formData.startTime && formData.endTime <= formData.startTime) {
       newErrors.endTime = 'End time must be after start time';
     }
     
-    if (formData.isRecurring && !formData.endDate) {
-      newErrors.endDate = 'End date is required for recurring availability';
-    } else if (formData.isRecurring && isBefore(new Date(formData.endDate), new Date(formData.startDate))) {
-      newErrors.endDate = 'End date must be after start date';
+    // Validate recurring options if enabled
+    if (formData.isRecurring) {
+      if (!formData.endDate) {
+        newErrors.endDate = 'End date is required for recurring availability';
+      } else if (isBefore(new Date(formData.endDate), new Date(formData.startDate))) {
+        newErrors.endDate = 'End date must be after start date';
+      }
+      
+      if (!formData.recurringDays?.length) {
+        newErrors.recurringDays = 'Please select at least one day';
+      }
     }
     
     setErrors(newErrors);
@@ -78,18 +89,12 @@ const AvailabilityForm = ({ onSuccess, initialData, onCancel }) => {
         recurringDays: formData.isRecurring ? formData.recurringDays : [],
       };
       
-      if (initialData?._id) {
-        await vendorApi.updateAvailability(initialData._id, payload);
-        toast.success('Availability updated successfully');
-      } else {
-        await vendorApi.addAvailability(payload);
-        toast.success('Availability added successfully');
+      if (typeof onSubmit === 'function') {
+        await onSubmit(payload);
       }
-      
-      if (onSuccess) onSuccess();
     } catch (error) {
-      console.error('Error saving availability:', error);
-      toast.error(error.response?.data?.message || 'Failed to save availability');
+      console.error('Error in form submission:', error);
+      toast.error(error.message || 'An error occurred while saving availability');
     } finally {
       setLoading(false);
     }

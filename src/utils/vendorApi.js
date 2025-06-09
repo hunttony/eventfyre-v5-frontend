@@ -44,5 +44,94 @@ export const vendorApi = {
     } catch (error) {
       return handleError(error);
     }
+  },
+
+  // Availability Management
+  getAvailability: async (id) => {
+    // If ID is provided, fetch a single availability
+    if (id) {
+      try {
+        const response = await get(`/vendor/availability/${id}`);
+        return {
+          success: true,
+          data: response?.data || null,
+          message: 'Availability retrieved successfully'
+        };
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+    
+    // Otherwise, fetch all availability
+    try {
+      const response = await get('/vendor/availability');
+      return {
+        success: true,
+        data: Array.isArray(response?.data) ? response.data : [],
+        message: 'Availability retrieved successfully'
+      };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+  
+  // Alias for getAvailability with ID
+  getAvailabilityById: async (id) => {
+    return vendorApi.getAvailability(id);
+  },
+
+  addAvailability: async (availabilityData) => {
+    try {
+      const response = await post('/vendor/availability', availabilityData);
+      return {
+        success: true,
+        data: response.data,
+        message: 'Availability added successfully'
+      };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  updateAvailability: async (availabilityId, availabilityData) => {
+    try {
+      const response = await put(`/vendor/availability/${availabilityId}`, availabilityData);
+      return {
+        success: true,
+        data: response.data,
+        message: 'Availability updated successfully'
+      };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
+  deleteAvailability: async (availabilityId) => {
+    try {
+      await del(`/vendor/availability/${availabilityId}`);
+      return {
+        success: true,
+        message: 'Availability deleted successfully'
+      };
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+  
+  // Get availability slots for a specific date range
+  getAvailabilitySlots: async (startDate, endDate, serviceId = null) => {
+    try {
+      const params = { startDate, endDate };
+      if (serviceId) params.serviceId = serviceId;
+      
+      const response = await get('/vendor/availability/slots', { params });
+      return {
+        success: true,
+        data: Array.isArray(response?.data) ? response.data : [],
+        message: 'Availability slots retrieved successfully'
+      };
+    } catch (error) {
+      return handleError(error);
+    }
   }
 };

@@ -55,12 +55,15 @@ const AvailabilityList = ({ refreshKey, onRefresh }) => {
     try {
       setLoading(true);
       const response = await vendorApi.getAvailability();
-      if (response?.data) {
+      if (response.success) {
         setAvailabilities(Array.isArray(response.data) ? response.data : []);
+      } else {
+        throw new Error(response.message || 'Failed to load availabilities');
       }
     } catch (error) {
       console.error('Error fetching availabilities:', error);
-      toast.error('Failed to load availabilities');
+      toast.error(error.message || 'Failed to load availabilities');
+      setAvailabilities([]); // Reset to empty array on error
     } finally {
       setLoading(false);
     }
@@ -80,12 +83,16 @@ const AvailabilityList = ({ refreshKey, onRefresh }) => {
     if (!selectedAvailability) return;
     
     try {
-      await vendorApi.deleteAvailability(selectedAvailability._id);
-      toast.success('Availability deleted successfully');
-      onRefresh();
+      const response = await vendorApi.deleteAvailability(selectedAvailability._id);
+      if (response.success) {
+        toast.success(response.message || 'Availability deleted successfully');
+        onRefresh?.();
+      } else {
+        throw new Error(response.message || 'Failed to delete availability');
+      }
     } catch (error) {
       console.error('Error deleting availability:', error);
-      toast.error('Failed to delete availability');
+      toast.error(error.message || 'Failed to delete availability');
     } finally {
       setIsDeleteDialogOpen(false);
       setSelectedAvailability(null);
@@ -121,36 +128,60 @@ const AvailabilityList = ({ refreshKey, onRefresh }) => {
     return { label: 'Upcoming', color: 'info' };
   };
 
-  if (loading && !availabilities.length) {
+  if (loading) {
     return (
-      <Box display="flex" justifyContent="center" p={3}>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
         <Typography>Loading availabilities...</Typography>
       </Box>
     );
   }
-
-  if (!loading && !availabilities.length) {
+  
+  if (availabilities.length === 0) {
     return (
-      <Box textAlign="center" p={4}>
-        <CalendarIcon color="disabled" style={{ fontSize: 48 }} />
-        <Typography variant="h6" gutterBottom>
-          No availability slots found
-        </Typography>
-        <Typography color="textSecondary" paragraph>
-          Get started by adding your first availability slot.
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => {
+      <>
+        <Box textAlign="center" p={4}>
+          <CalendarIcon color="disabled" style={{ fontSize: 48 }} />
+          <Typography variant="h6" gutterBottom>
+            No availability slots found
+          </Typography>
+          <Typography color="textSecondary" paragraph>
+            Get started by adding your first availability slot.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              setSelectedAvailability(null);
+              setIsFormOpen(true);
+            }}
+            startIcon={<CalendarIcon />}
+          >
+            Add Availability
+          </Button>
+        </Box>
+
+        <Dialog
+          open={isFormOpen}
+          onClose={() => {
+            setIsFormOpen(false);
             setSelectedAvailability(null);
-            setIsFormOpen(true);
           }}
-          startIcon={<CalendarIcon />}
+          maxWidth="md"
+          fullWidth
         >
-          Add Availability
-        </Button>
-      </Box>
+          <DialogTitle>Add New Availability</DialogTitle>
+          <DialogContent dividers>
+            <AvailabilityForm
+              initialData={null}
+              onSuccess={() => {
+                setIsFormOpen(false);
+                onRefresh?.();
+              }}
+              onCancel={() => setIsFormOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 

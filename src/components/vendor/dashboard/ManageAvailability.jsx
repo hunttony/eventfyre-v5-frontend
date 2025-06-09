@@ -34,14 +34,20 @@ const ManageAvailability = () => {
   const handleSubmit = async (formData) => {
     try {
       setSubmitting(true);
+      let response;
+      
       if (id) {
-        await vendorApi.updateAvailability(id, formData);
-        toast.success('Availability updated successfully');
+        response = await vendorApi.updateAvailability(id, formData);
       } else {
-        await vendorApi.addAvailability(formData);
-        toast.success('Availability added successfully');
+        response = await vendorApi.addAvailability(formData);
       }
-      navigate('/vendor/availability');
+      
+      if (response.success) {
+        toast.success(response.message || (id ? 'Availability updated successfully' : 'Availability added successfully'));
+        navigate('/vendor/availability');
+      } else {
+        throw new Error(response.message || 'Failed to save availability');
+      }
     } catch (error) {
       console.error('Error saving availability:', error);
       toast.error(error.message || 'Failed to save availability');
