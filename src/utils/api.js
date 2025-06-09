@@ -274,7 +274,10 @@ export const del = (url, config = {}) => {
 
 // Auth API calls
 export const authApi = {
-  login: async (credentials) => {
+  login: async (credentials, retryCount = 0) => {
+    const maxRetries = 2;
+    const baseDelay = 1000; // 1 second
+
     try {
       if (!credentials?.email || !credentials?.password) {
         throw new Error('Email and password are required');
@@ -309,7 +312,26 @@ export const authApi = {
       };
     } catch (error) {
       console.error('Login error:', error.message, error.response?.data);
-      throw new Error(error.response?.data?.message || 'Login failed');
+      
+      // Handle rate limiting with retry
+      if (error.response?.status === 429 && retryCount < maxRetries) {
+        const delay = baseDelay * Math.pow(2, retryCount);
+        console.log(`Rate limited. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return authApi.login(credentials, retryCount + 1);
+      }
+      
+      // Handle specific error messages
+      let errorMessage = 'Login failed';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 429) {
+        errorMessage = 'Too many login attempts. Please wait a few minutes and try again.';
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 
@@ -787,15 +809,19 @@ export const vendorApi = {
 
   getServices: async () => {
     try {
-      const response = await get('/vendors/services');
+      const response = await get('/vendors/me/services');
       return {
-        data: response.data,
         success: true,
+        data: Array.isArray(response.data) ? response.data : [],
         message: 'Services retrieved successfully'
       };
     } catch (error) {
       console.error('Get services error:', error.message, error.response?.data);
-      throw new Error(error.response?.data?.message || 'Failed to retrieve services');
+      return {
+        success: false,
+        data: [],
+        message: error.response?.data?.message || 'Failed to fetch services'
+      };
     }
   },
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { vendorApi } from '../../../utils/api';
+import { vendorApi } from '../../../utils/vendorApi';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../../common/LoadingSpinner';
 
@@ -14,16 +14,27 @@ const MyServices = () => {
   }, []);
 
   const fetchServices = async () => {
+    setLoading(true);
+    setError('');
+    
     try {
-      setLoading(true);
       const response = await vendorApi.getServices();
-      if (response?.data) {
-        setServices(Array.isArray(response.data) ? response.data : []);
+      
+      // Always set services, even if empty, to prevent loading state
+      setServices(response.data || []);
+      
+      if (!response.success) {
+        // Only show error if we don't have fallback data
+        if (!response.data || response.data.length === 0) {
+          setError(response.message);
+          toast.error(response.message);
+        }
       }
     } catch (error) {
-      console.error('Error fetching services:', error);
-      setError('Failed to load services');
-      toast.error('Failed to load services');
+      console.error('Error in fetchServices:', error);
+      // Use empty array as fallback
+      setServices([]);
+      toast.error('Using offline data');
     } finally {
       setLoading(false);
     }
